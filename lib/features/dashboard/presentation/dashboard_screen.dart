@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../attendance/data/attendance_repository.dart';
@@ -91,20 +92,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFFFFE37A), AppColors.gold]),
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(color: Colors.white24),
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.gold, width: 1.5),
                     boxShadow: const [
                       BoxShadow(
                           color: Colors.black26,
                           blurRadius: 8,
                           offset: Offset(0, 3))
                     ]),
-                child: const Icon(Icons.qr_code_2_rounded,
-                    color: AppColors.navy, size: 25)),
+                clipBehavior: Clip.antiAlias,
+                child: widget.session.profileImage.isNotEmpty
+                    ? Transform.scale(
+                        scale: 1.16,
+                        child: Image.network(_adminPhotoUrl,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _adminInitials()),
+                      )
+                    : _adminInitials()),
             const SizedBox(width: 10),
             Expanded(
                 child: Column(
@@ -193,9 +200,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ]),
       );
 
+  Widget _adminInitials() {
+    final parts = widget.session.username
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    final initials = parts.isEmpty
+        ? 'A'
+        : parts.take(2).map((part) => part[0].toUpperCase()).join();
+    return Container(
+      color: AppColors.gold.withValues(alpha: .2),
+      alignment: Alignment.center,
+      child: Text(initials,
+          style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 14,
+              fontWeight: FontWeight.w900)),
+    );
+  }
+
+  String get _adminPhotoUrl {
+    final path = widget.session.profileImage.trim();
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    final api = Uri.parse(AppConfig.apiBaseUrl);
+    return '${api.origin}/${path.replaceFirst(RegExp(r'^/+'), '')}';
+  }
+
   List<Widget> _content() {
     final registered = Map<String, dynamic>.from(data!['registered']);
     final attended = Map<String, dynamic>.from(data!['attended']);
+    final overallAttended = Map<String, dynamic>.from(
+        data!['overallAttended'] ?? data!['attended']);
     final days = List<String>.from(data!['days']);
     final recent = List<Map<String, dynamic>>.from(data!['recent']);
     final companies = List<Map<String, dynamic>>.from(data!['companies'] ?? []);
@@ -279,7 +315,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                       child: _category(
                           'Visitors',
-                          attended['visitor'],
+                          overallAttended['visitor'],
                           registered['visitor'],
                           Icons.groups_2_rounded,
                           const Color(0xFF176B87))),
@@ -287,7 +323,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                       child: _category(
                           'Buyers',
-                          attended['buyer'],
+                          overallAttended['buyer'],
                           registered['buyer'],
                           Icons.handshake_rounded,
                           const Color(0xFF7A4EB2))),
@@ -295,7 +331,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                       child: _category(
                           'Exhibitors',
-                          attended['exhibitor'],
+                          overallAttended['exhibitor'],
                           registered['exhibitor'],
                           Icons.storefront_rounded,
                           AppColors.green)),
@@ -314,9 +350,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     primary: false,
                     padding: EdgeInsets.zero,
                     physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 7,
+                    mainAxisSpacing: 5,
                     crossAxisSpacing: 7,
-                    childAspectRatio: 2.65,
+                    childAspectRatio: 3.35,
                     children: attendanceSubTypes
                         .where((item) =>
                             selectedType.isEmpty || item.parent == selectedType)
@@ -522,11 +558,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           String label, dynamic attended, dynamic registered, String parent) =>
       Card(
           child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
               child: Row(children: [
                 Container(
                     width: 8,
-                    height: 28,
+                    height: 22,
                     decoration: BoxDecoration(
                         color: parent == 'visitor'
                             ? const Color(0xFF176B87)
@@ -536,20 +572,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         borderRadius: BorderRadius.circular(8))),
                 const SizedBox(width: 7),
                 Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                      Text(label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 9, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 1),
-                      Text('$attended / $registered',
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w900))
-                    ]))
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 9.5, fontWeight: FontWeight.w800)),
+                ),
+                const SizedBox(width: 5),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('$attended/$registered',
+                      maxLines: 1,
+                      softWrap: false,
+                      style: const TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900)),
+                )
               ])));
 
   Widget _metric(String label, String value, IconData icon, Color color) =>
@@ -660,11 +699,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(children: [
                 Icon(icon, color: color, size: 19),
                 const SizedBox(height: 4),
-                Text('${count ?? 0}',
-                    style: const TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.w900)),
-                Text('/ ${total ?? 0}',
-                    style: const TextStyle(fontSize: 9, color: Colors.black38)),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('${count ?? 0}/${total ?? 0}',
+                      maxLines: 1,
+                      softWrap: false,
+                      style: const TextStyle(
+                          fontSize: 16,
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w900)),
+                ),
                 const SizedBox(height: 3),
                 Text(label,
                     textAlign: TextAlign.center,

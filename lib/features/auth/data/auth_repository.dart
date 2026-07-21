@@ -28,6 +28,7 @@ class AuthRepository {
         newUsername: admin['fullName']?.toString().isNotEmpty == true
             ? admin['fullName']
             : admin['username'],
-        newRole: role);
+        newRole: role,
+        newProfileImage: admin['profileImage']?.toString() ?? '');
   }
 }

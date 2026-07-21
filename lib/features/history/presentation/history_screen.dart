@@ -154,43 +154,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           if (days.isNotEmpty)
             SizedBox(
-              height: 38,
+              height: 36,
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 scrollDirection: Axis.horizontal,
                 children: [
                   _dayChip('', 'All days'),
-                  ...days.asMap().entries.map(
-                      (entry) => _dayChip(entry.value, 'Day ${entry.key + 1}')),
+                  ...days.map((value) => _dayChip(
+                      value,
+                      DateFormat('EEE, d MMM')
+                          .format(DateTime.parse(value)))),
                 ],
               ),
             ),
           SizedBox(
-            height: 40,
+            height: 34,
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 18),
               scrollDirection: Axis.horizontal,
               children: attendanceTypes
-                  .map((item) => Padding(
-                        padding: const EdgeInsets.only(right: 7),
-                        child: ChoiceChip(
-                          showCheckmark: true,
-                          label: Text(item.label),
-                          selected: type == item.value,
-                          onSelected: (_) {
-                            type = item.value;
-                            subType = '';
-                            load();
-                          },
-                        ),
-                      ))
+                  .map((item) => _typeChip(item.value, item.label))
                   .toList(),
             ),
           ),
           if (type.isNotEmpty) ...[
             const SizedBox(height: 5),
             SizedBox(
-              height: 36,
+              height: 32,
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 scrollDirection: Axis.horizontal,
@@ -211,12 +201,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
         padding: const EdgeInsets.only(right: 7),
         child: ChoiceChip(
           showCheckmark: true,
+          checkmarkColor: Colors.white,
+          visualDensity: const VisualDensity(horizontal: -1, vertical: -2),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           label: Text(label),
           selected: day == value,
           onSelected: (_) {
             day = value;
             load();
           },
+          selectedColor: AppColors.green,
+          labelStyle: TextStyle(
+              color: day == value ? Colors.white : AppColors.ink,
+              fontSize: 10,
+              fontWeight: FontWeight.w700),
+        ),
+      );
+
+  Widget _typeChip(String value, String label) => Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ChoiceChip(
+          showCheckmark: true,
+          checkmarkColor: Colors.white,
+          visualDensity: const VisualDensity(horizontal: -1, vertical: -2),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          label: Text(label),
+          selected: type == value,
+          onSelected: (_) {
+            type = value;
+            subType = '';
+            load();
+          },
+          selectedColor: AppColors.navy,
+          labelStyle: TextStyle(
+              color: type == value ? Colors.white : AppColors.ink,
+              fontSize: 11,
+              fontWeight: FontWeight.w800),
         ),
       );
 
@@ -280,6 +300,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         padding: const EdgeInsets.only(right: 7),
         child: ChoiceChip(
           showCheckmark: true,
+          checkmarkColor: Colors.white,
+          visualDensity: const VisualDensity(horizontal: -1, vertical: -2),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           label: Text(label),
           selected: subType == value,
           selectedColor: AppColors.green,
