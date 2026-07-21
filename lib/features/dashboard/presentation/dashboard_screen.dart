@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/attendance_profile_screen.dart';
+import '../../attendance/presentation/ai_summary_dialog.dart';
 import 'company_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -26,6 +27,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String selectedType = '';
   String selectedSubType = '';
   Object? error;
+  bool exportingCompanies = false;
 
   @override
   void initState() {
@@ -159,18 +161,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ]),
           ],
           const SizedBox(height: 11),
-          FilledButton.icon(
-              onPressed: widget.onScan,
-              style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.gold,
-                  foregroundColor: AppColors.navy,
-                  minimumSize: const Size(0, 38),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: const TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w900)),
-              icon: const Icon(Icons.qr_code_scanner_rounded, size: 17),
-              label: const Text('SCAN ENTRY QR')),
+          Row(children: [
+            FilledButton.icon(
+                onPressed: widget.onScan,
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.gold,
+                    foregroundColor: AppColors.navy,
+                    minimumSize: const Size(0, 38),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w900)),
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 17),
+                label: const Text('SCAN ENTRY QR')),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: () => showAiSummaryDialog(context,
+                  repository: widget.repository, scope: 'exhibition'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white38),
+                minimumSize: const Size(0, 38),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              icon: const Icon(Icons.auto_awesome_rounded,
+                  color: AppColors.gold, size: 16),
+              label: const Text('AI SUMMARY',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
+            ),
+          ]),
         ]),
       );
 
@@ -318,9 +337,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 letterSpacing: 1.4,
                                 fontWeight: FontWeight.w900,
                                 color: Colors.black45)),
-                        Text('${companies.length} present',
-                            style: const TextStyle(
-                                fontSize: 10, color: Colors.black38))
+                        Row(mainAxisSize: MainAxisSize.min, children: [
+                          Text('${companies.length} present',
+                              style: const TextStyle(
+                                  fontSize: 10, color: Colors.black38)),
+                          const SizedBox(width: 5),
+                          SizedBox(
+                            height: 30,
+                            child: OutlinedButton.icon(
+                              onPressed: exportingCompanies
+                                  ? null
+                                  : _exportCompanies,
+                              icon: exportingCompanies
+                                  ? const SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2))
+                                  : const Icon(Icons.file_download_outlined,
+                                      size: 15),
+                              label: const Text('EXCEL',
+                                  style: TextStyle(fontSize: 9)),
+                            ),
+                          ),
+                        ])
                       ]),
                   const SizedBox(height: 6),
                   SizedBox(
@@ -378,6 +418,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
               itemCount: recent.length,
               itemBuilder: (_, i) => _recent(recent[i]))),
     ];
+  }
+
+  Future<void> _exportCompanies() async {
+    setState(() => exportingCompanies = true);
+    try {
+      final path = await widget.repository.exportAttendance(
+          day: selectedDay, type: 'exhibitor');
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.check_circle_rounded,
+              color: AppColors.emerald, size: 38),
+          title: const Text('Company Excel ready'),
+          content: SelectableText('Saved on this device:\n$path',
+              textAlign: TextAlign.center),
+          actions: [
+            FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Done'))
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => exportingCompanies = false);
+    }
   }
 
   Widget _dayChip(String? day, String label) => Padding(

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/attendance_repository.dart';
 import '../domain/attendance_categories.dart';
+import 'ai_summary_dialog.dart';
 
 class AttendanceProfileScreen extends StatefulWidget {
   const AttendanceProfileScreen({
@@ -42,7 +43,21 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Attendance Profile')),
+        appBar: AppBar(
+          title: const Text('Attendance Profile'),
+          actions: [
+            IconButton(
+              tooltip: 'AI profile summary',
+              onPressed: () => showAiSummaryDialog(context,
+                  repository: widget.repository,
+                  scope: 'person',
+                  id: widget.attendanceId),
+              icon: const Icon(Icons.auto_awesome_rounded,
+                  color: AppColors.green),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
         body: data == null
             ? Center(
                 child: error == null

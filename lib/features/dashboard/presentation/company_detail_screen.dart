@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/attendance_profile_screen.dart';
+import '../../attendance/presentation/ai_summary_dialog.dart';
 
 class CompanyDetailScreen extends StatefulWidget {
   const CompanyDetailScreen({
@@ -24,6 +25,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   Map<String, dynamic>? data;
   Object? error;
   String selectedPassType = '';
+  bool exporting = false;
 
   static const passLabels = <String, String>{
     'exhibitor': 'Exhibitor',
@@ -52,7 +54,32 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Company Attendance')),
+        appBar: AppBar(
+          title: const Text('Company Attendance'),
+          actions: [
+            IconButton(
+              tooltip: 'AI company summary',
+              onPressed: () => showAiSummaryDialog(context,
+                  repository: widget.repository,
+                  scope: 'company',
+                  id: widget.companyId),
+              icon: const Icon(Icons.auto_awesome_rounded,
+                  color: AppColors.green),
+            ),
+            IconButton(
+              tooltip: 'Export company Excel',
+              onPressed: exporting ? null : _export,
+              icon: exporting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.file_download_outlined,
+                      color: AppColors.green),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
         body: data == null
             ? Center(
                 child: error == null
@@ -64,6 +91,37 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
                       ]))
             : RefreshIndicator(onRefresh: load, child: _content()),
       );
+
+  Future<void> _export() async {
+    setState(() => exporting = true);
+    try {
+      final path = await widget.repository
+          .exportAttendance(companyId: widget.companyId, type: 'exhibitor');
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.check_circle_rounded,
+              color: AppColors.emerald, size: 38),
+          title: const Text('Company Excel ready'),
+          content: SelectableText('Saved on this device:\n$path',
+              textAlign: TextAlign.center),
+          actions: [
+            FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Done'))
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => exporting = false);
+    }
+  }
 
   Widget _content() {
     final company = Map<String, dynamic>.from(data!['company']);

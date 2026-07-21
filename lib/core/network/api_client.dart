@@ -29,6 +29,17 @@ class ApiClient {
         await http.post(uri, headers: _headers, body: jsonEncode(body)));
   }
 
+  Future<http.Response> download(String path,
+      {Map<String, String>? query}) async {
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path')
+        .replace(queryParameters: query);
+    final response = await http.get(uri, headers: _headers);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _decode(response);
+    }
+    return response;
+  }
+
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         if (session.token != null) 'Authorization': 'Bearer ${session.token}',

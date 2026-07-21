@@ -29,12 +29,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Timer? debounce;
   String type = '';
   String subType = '';
+  String day = '';
+  List<String> days = [];
+  bool exporting = false;
 
   @override
   void initState() {
     super.initState();
     scroll.addListener(_onScroll);
+    _loadDays();
     load();
+  }
+
+  Future<void> _loadDays() async {
+    try {
+      final dashboard = await widget.repository.dashboard();
+      if (mounted) {
+        setState(() => days = List<String>.from(dashboard['days'] ?? []));
+      }
+    } catch (_) {
+      // Records remain usable when event metadata is temporarily unavailable.
+    }
   }
 
   void _onScroll() {
@@ -59,6 +74,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final next = await widget.repository.records(
         type: type,
         subType: subType,
+        day: day,
         search: search.text.trim(),
         page: targetPage,
         limit: 50,
@@ -100,6 +116,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   style: TextStyle(fontSize: 11, color: Colors.black45)),
             ],
           ),
+          actions: [
+            IconButton(
+              tooltip: 'Export filtered Excel',
+              onPressed: exporting ? null : _exportExcel,
+              icon: exporting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.file_download_outlined,
+                      color: AppColors.green),
+            ),
+            const SizedBox(width: 8),
+          ],
         ),
         body: Column(children: [
           Padding(
@@ -122,6 +152,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
           ),
+          if (days.isNotEmpty)
+            SizedBox(
+              height: 38,
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _dayChip('', 'All days'),
+                  ...days.asMap().entries.map(
+                      (entry) => _dayChip(entry.value, 'Day ${entry.key + 1}')),
+                ],
+              ),
+            ),
           SizedBox(
             height: 40,
             child: ListView(
@@ -163,6 +206,54 @@ class _HistoryScreenState extends State<HistoryScreen> {
           Expanded(child: _body()),
         ]),
       );
+
+  Widget _dayChip(String value, String label) => Padding(
+        padding: const EdgeInsets.only(right: 7),
+        child: ChoiceChip(
+          showCheckmark: true,
+          label: Text(label),
+          selected: day == value,
+          onSelected: (_) {
+            day = value;
+            load();
+          },
+        ),
+      );
+
+  Future<void> _exportExcel() async {
+    setState(() => exporting = true);
+    try {
+      final path = await widget.repository.exportAttendance(
+        day: day,
+        type: type,
+        subType: subType,
+        search: search.text.trim(),
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.check_circle_rounded,
+              color: AppColors.emerald, size: 38),
+          title: const Text('Excel export ready'),
+          content: SelectableText('Saved on this device:\n$path',
+              textAlign: TextAlign.center),
+          actions: [
+            FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Done'))
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Export failed: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => exporting = false);
+    }
+  }
 
   Widget _body() {
     if (loading) return const Center(child: CircularProgressIndicator());
