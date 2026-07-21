@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_skeleton.dart';
 import '../data/attendance_repository.dart';
 
 Future<void> showAiSummaryDialog(
@@ -106,11 +107,20 @@ class _AiSummarySheetState extends State<_AiSummarySheet> {
                 ? Padding(
                     padding: const EdgeInsets.all(38),
                     child: error == null
-                        ? const Column(mainAxisSize: MainAxisSize.min, children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 14),
-                            Text('Analysing attendance data...')
-                          ])
+                        ? const AppSkeleton(
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SkeletonBox(
+                                      width: 190, height: 16, radius: 7),
+                                  SizedBox(height: 14),
+                                  SkeletonBox(height: 58, radius: 12),
+                                  SizedBox(height: 9),
+                                  SkeletonBox(height: 58, radius: 12),
+                                  SizedBox(height: 12),
+                                  Text('Analysing attendance data...')
+                                ]),
+                          )
                         : Column(mainAxisSize: MainAxisSize.min, children: [
                             const Icon(Icons.error_outline_rounded,
                                 color: Colors.redAccent, size: 38),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_skeleton.dart';
 import '../data/attendance_repository.dart';
 import '../domain/attendance_categories.dart';
 import 'ai_summary_dialog.dart';
@@ -61,7 +62,7 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
         body: data == null
             ? Center(
                 child: error == null
-                    ? const CircularProgressIndicator()
+                    ? const AppProfileSkeleton()
                     : Column(mainAxisSize: MainAxisSize.min, children: [
                         Text('$error', textAlign: TextAlign.center),
                         const SizedBox(height: 10),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_skeleton.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/attendance_profile_screen.dart';
@@ -83,7 +84,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
         body: data == null
             ? Center(
                 child: error == null
-                    ? const CircularProgressIndicator()
+                    ? const AppProfileSkeleton()
                     : Column(mainAxisSize: MainAxisSize.min, children: [
                         Text('$error'),
                         const SizedBox(height: 10),
@@ -270,11 +271,16 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
       else
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-          sliver: SliverFixedExtentList.builder(
-            itemExtent: 68,
-            itemCount: memberAttendance.length,
-            itemBuilder: (_, i) => _memberCard(memberAttendance[i]),
-          ),
+          sliver: memberAttendance.length <= 7
+              ? SliverList(
+                  delegate: SliverChildListDelegate(memberAttendance
+                      .map(_memberCard)
+                      .toList(growable: false)))
+              : SliverFixedExtentList.builder(
+                  itemExtent: 68,
+                  itemCount: memberAttendance.length,
+                  itemBuilder: (_, i) => _memberCard(memberAttendance[i]),
+                ),
         ),
     ]);
   }

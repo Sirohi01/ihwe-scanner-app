@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_skeleton.dart';
 import '../../attendance/data/attendance_repository.dart';
 import 'widgets/person_confirmation_sheet.dart';
 
@@ -100,7 +101,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 bottom: 26,
                 child: Column(children: [
                   if (busy)
-                    const CircularProgressIndicator(color: AppColors.gold)
+                    const AppSkeleton(
+                      child: SkeletonBox(width: 118, height: 32, radius: 16),
+                    )
                   else
                     const Icon(Icons.qr_code_2_rounded,
                         color: AppColors.gold, size: 32),

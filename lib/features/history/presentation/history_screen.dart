@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_skeleton.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/attendance_profile_screen.dart';
@@ -276,23 +277,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _body() {
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) return const AppListSkeleton(count: 7);
     if (records.isEmpty) {
       return const Center(child: Text('No attendance records found.'));
     }
     return RefreshIndicator(
       onRefresh: load,
-      child: ListView.builder(
-        controller: scroll,
-        padding: const EdgeInsets.fromLTRB(18, 2, 18, 90),
-        itemExtent: 76,
-        cacheExtent: 380,
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        itemCount: records.length + (loadingMore ? 1 : 0),
-        itemBuilder: (_, i) => i == records.length
-            ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-            : _recordCard(records[i]),
-      ),
+      child: records.length <= 7
+          ? ListView(
+              controller: scroll,
+              padding: const EdgeInsets.fromLTRB(18, 2, 18, 90),
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              children: records.map(_recordCard).toList(),
+            )
+          : ListView.builder(
+              controller: scroll,
+              padding: const EdgeInsets.fromLTRB(18, 2, 18, 90),
+              itemExtent: 76,
+              cacheExtent: 380,
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              itemCount: records.length + (loadingMore ? 1 : 0),
+              itemBuilder: (_, i) => i == records.length
+                  ? const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : _recordCard(records[i]),
+            ),
     );
   }
 

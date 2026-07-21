@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_skeleton.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/attendance_profile_screen.dart';
@@ -55,8 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final slivers = <Widget>[SliverToBoxAdapter(child: _hero())];
     if (data == null && error == null) {
-      slivers.add(const SliverFillRemaining(
-          child: Center(child: CircularProgressIndicator())));
+      slivers.add(const SliverToBoxAdapter(child: DashboardSkeleton()));
     } else if (error != null) {
       slivers.add(SliverFillRemaining(
         child: Center(
@@ -449,10 +449,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ]))),
       SliverPadding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 105),
-          sliver: SliverFixedExtentList.builder(
-              itemExtent: 63,
-              itemCount: recent.length,
-              itemBuilder: (_, i) => _recent(recent[i]))),
+          sliver: recent.length <= 7
+              ? SliverList(
+                  delegate: SliverChildListDelegate(
+                      recent.map(_recent).toList(growable: false)))
+              : SliverFixedExtentList.builder(
+                  itemExtent: 63,
+                  itemCount: recent.length,
+                  itemBuilder: (_, i) => _recent(recent[i]))),
     ];
   }
 
