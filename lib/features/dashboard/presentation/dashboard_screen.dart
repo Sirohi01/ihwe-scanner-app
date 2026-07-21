@@ -84,13 +84,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Container(
-                width: 38,
-                height: 38,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                    color: AppColors.gold,
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.auto_graph_rounded,
-                    color: AppColors.navy, size: 21)),
+                    gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFFFE37A), AppColors.gold]),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: Colors.white24),
+                    boxShadow: const [
+                      BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 8,
+                          offset: Offset(0, 3))
+                    ]),
+                child: const Icon(Icons.qr_code_2_rounded,
+                    color: AppColors.navy, size: 25)),
             const SizedBox(width: 10),
             Expanded(
                 child: Column(
@@ -109,9 +119,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           fontWeight: FontWeight.w800,
                           fontSize: 15))
                 ])),
-            IconButton(
+            IconButton.filled(
                 onPressed: widget.session.clear,
-                icon: const Icon(Icons.logout_rounded, color: Colors.white70)),
+                tooltip: 'Logout',
+                style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFD94141),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(34, 34),
+                    maximumSize: const Size(34, 34),
+                    padding: EdgeInsets.zero),
+                icon: const Icon(Icons.logout_rounded, size: 18)),
           ]),
           const SizedBox(height: 14),
           const Text('Live Attendance',
@@ -166,7 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Map<String, dynamic>.from(attended['bySubType'] ?? {});
     return [
       SliverPadding(
-          padding: const EdgeInsets.fromLTRB(18, 17, 18, 0),
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 0),
           sliver: SliverToBoxAdapter(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,9 +194,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         letterSpacing: 1.4,
                         fontWeight: FontWeight.w900,
                         color: Colors.black45)),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 SizedBox(
-                    height: 44,
+                    height: 36,
                     child:
                         ListView(scrollDirection: Axis.horizontal, children: [
                       _dayChip(null, 'All days'),
@@ -188,25 +205,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           DateFormat('EEE, d MMM')
                               .format(DateTime.parse(day)))),
                     ])),
-                const SizedBox(height: 15),
+                const SizedBox(height: 9),
                 const Text('REGISTRATION TYPE',
                     style: TextStyle(
                         fontSize: 11,
                         letterSpacing: 1.4,
                         fontWeight: FontWeight.w900,
                         color: Colors.black45)),
-                const SizedBox(height: 9),
+                const SizedBox(height: 6),
                 SizedBox(
-                    height: 40,
+                    height: 34,
                     child: ListView(
                         scrollDirection: Axis.horizontal,
                         children: attendanceTypes
                             .map((item) => _typeChip(item.value, item.label))
                             .toList())),
                 if (selectedType.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 5),
                   SizedBox(
-                      height: 38,
+                      height: 32,
                       child:
                           ListView(scrollDirection: Axis.horizontal, children: [
                         _subTypeChip(
@@ -215,27 +232,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             (item) => _subTypeChip(item.value, item.label)),
                       ])),
                 ],
-                const SizedBox(height: 18),
+                const SizedBox(height: 10),
                 Row(children: [
                   Expanded(
                       child: _metric('Present', '${attended['total']}',
                           Icons.how_to_reg_rounded, AppColors.emerald)),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                       child: _metric('Not arrived', '${data!['notAttended']}',
                           Icons.person_off_outlined, const Color(0xFFE06A4E))),
                 ]),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 _progress(attended['total'] ?? 0,
                     data!['scopeRegistered'] ?? registered['total'] ?? 0),
-                const SizedBox(height: 22),
+                const SizedBox(height: 11),
                 const Text('ATTENDANCE BY CATEGORY',
                     style: TextStyle(
                         fontSize: 11,
                         letterSpacing: 1.4,
                         fontWeight: FontWeight.w900,
                         color: Colors.black45)),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 Row(children: [
                   Expanded(
                       child: _category(
@@ -244,7 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           registered['visitor'],
                           Icons.groups_2_rounded,
                           const Color(0xFF176B87))),
-                  const SizedBox(width: 9),
+                  const SizedBox(width: 7),
                   Expanded(
                       child: _category(
                           'Buyers',
@@ -252,7 +269,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           registered['buyer'],
                           Icons.handshake_rounded,
                           const Color(0xFF7A4EB2))),
-                  const SizedBox(width: 9),
+                  const SizedBox(width: 7),
                   Expanded(
                       child: _category(
                           'Exhibitors',
@@ -261,21 +278,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Icons.storefront_rounded,
                           AppColors.green)),
                 ]),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 const Text('DETAILED BREAKDOWN',
                     style: TextStyle(
                         fontSize: 11,
                         letterSpacing: 1.4,
                         fontWeight: FontWeight.w900,
                         color: Colors.black45)),
-                const SizedBox(height: 9),
+                const SizedBox(height: 5),
                 GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
+                    primary: false,
+                    padding: EdgeInsets.zero,
                     physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 9,
-                    crossAxisSpacing: 9,
-                    childAspectRatio: 2.15,
+                    mainAxisSpacing: 7,
+                    crossAxisSpacing: 7,
+                    childAspectRatio: 2.65,
                     children: attendanceSubTypes
                         .where((item) =>
                             selectedType.isEmpty || item.parent == selectedType)
@@ -285,7 +304,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             registeredBySubType[item.value] ?? 0,
                             item.parent))
                         .toList()),
-                const SizedBox(height: 24),
+                const SizedBox(height: 9),
                 Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -301,7 +320,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ]),
               ]))),
       SliverPadding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 110),
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 105),
           sliver: SliverList.builder(
               itemCount: recent.length,
               itemBuilder: (_, i) => _recent(recent[i]))),
@@ -311,6 +330,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _dayChip(String? day, String label) => Padding(
       padding: const EdgeInsets.only(right: 8),
       child: ChoiceChip(
+          showCheckmark: true,
+          checkmarkColor: Colors.white,
+          visualDensity: const VisualDensity(horizontal: -1, vertical: -2),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           label: Text(label),
           selected: selectedDay == day,
           onSelected: (_) {
@@ -323,11 +346,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           selectedColor: AppColors.green,
           labelStyle: TextStyle(
               color: selectedDay == day ? Colors.white : AppColors.ink,
+              fontSize: 10,
               fontWeight: FontWeight.w700)));
 
   Widget _typeChip(String value, String label) => Padding(
       padding: const EdgeInsets.only(right: 8),
       child: ChoiceChip(
+          showCheckmark: true,
+          checkmarkColor: Colors.white,
+          visualDensity: const VisualDensity(horizontal: -1, vertical: -2),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           label: Text(label),
           selected: selectedType == value,
           onSelected: (_) {
@@ -347,6 +375,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _subTypeChip(String value, String label) => Padding(
       padding: const EdgeInsets.only(right: 7),
       child: ChoiceChip(
+          showCheckmark: true,
+          checkmarkColor: Colors.white,
+          visualDensity: const VisualDensity(horizontal: -1, vertical: -2),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           label: Text(label),
           selected: selectedSubType == value,
           onSelected: (_) {
@@ -366,11 +398,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           String label, dynamic attended, dynamic registered, String parent) =>
       Card(
           child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               child: Row(children: [
                 Container(
                     width: 8,
-                    height: 34,
+                    height: 28,
                     decoration: BoxDecoration(
                         color: parent == 'visitor'
                             ? const Color(0xFF176B87)
@@ -378,7 +410,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ? const Color(0xFF7A4EB2)
                                 : AppColors.green,
                         borderRadius: BorderRadius.circular(8))),
-                const SizedBox(width: 9),
+                const SizedBox(width: 7),
                 Expanded(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,33 +420,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 10, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 2),
+                              fontSize: 9, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 1),
                       Text('$attended / $registered',
                           style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w900))
+                              fontSize: 13, fontWeight: FontWeight.w900))
                     ]))
               ])));
 
   Widget _metric(String label, String value, IconData icon, Color color) =>
       Card(
           child: Padding(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
               child: Row(children: [
                 Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
                         color: color.withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(14)),
-                    child: Icon(icon, color: color)),
-                const SizedBox(width: 12),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Icon(icon, color: color, size: 19)),
+                const SizedBox(width: 8),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(value,
                       style: const TextStyle(
-                          fontSize: 26, fontWeight: FontWeight.w900)),
+                          fontSize: 21, fontWeight: FontWeight.w900)),
                   Text(label,
                       style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 9,
                           color: Colors.black45,
                           fontWeight: FontWeight.w700))
                 ])
@@ -423,19 +455,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final ratio = total == 0 ? 0.0 : (present / total).clamp(0, 1).toDouble();
     return Card(
         child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
             child: Column(children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 const Text('Overall arrival rate',
-                    style: TextStyle(fontWeight: FontWeight.w800)),
+                    style:
+                        TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
                 Text('${(ratio * 100).toStringAsFixed(1)}%',
                     style: const TextStyle(
-                        fontWeight: FontWeight.w900, color: AppColors.green))
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.green))
               ]),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               LinearProgressIndicator(
                   value: ratio,
-                  minHeight: 9,
+                  minHeight: 6,
                   borderRadius: BorderRadius.circular(10),
                   backgroundColor: const Color(0xFFE8EFEB),
                   color: AppColors.emerald)
@@ -446,28 +481,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Color color) =>
       Card(
           child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 5),
               child: Column(children: [
-                Icon(icon, color: color),
-                const SizedBox(height: 8),
+                Icon(icon, color: color, size: 19),
+                const SizedBox(height: 4),
                 Text('${count ?? 0}',
                     style: const TextStyle(
-                        fontSize: 21, fontWeight: FontWeight.w900)),
+                        fontSize: 17, fontWeight: FontWeight.w900)),
                 Text('/ ${total ?? 0}',
-                    style:
-                        const TextStyle(fontSize: 10, color: Colors.black38)),
-                const SizedBox(height: 5),
+                    style: const TextStyle(fontSize: 9, color: Colors.black38)),
+                const SizedBox(height: 3),
                 Text(label,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                        fontSize: 10, fontWeight: FontWeight.w800))
+                        fontSize: 9, fontWeight: FontWeight.w800))
               ])));
   Widget _recent(Map<String, dynamic> item) => Card(
-      margin: const EdgeInsets.only(bottom: 9),
+      margin: const EdgeInsets.only(bottom: 7),
       child: ListTile(
+          dense: true,
+          visualDensity: const VisualDensity(vertical: -2),
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              const EdgeInsets.symmetric(horizontal: 11, vertical: 1),
           leading: CircleAvatar(
+              radius: 18,
               backgroundColor: AppColors.green.withValues(alpha: .1),
               foregroundColor: AppColors.green,
               child: Text((item['name']?.toString().trim().isNotEmpty == true
@@ -479,13 +516,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ? item['name']
                   : item['registrationId'],
               maxLines: 1,
-              style: const TextStyle(fontWeight: FontWeight.w800)),
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
           subtitle: Text('${item['subjectType']} • ${item['registrationId']}',
               maxLines: 1),
           trailing:
               Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             const Icon(Icons.check_circle_rounded,
-                color: AppColors.emerald, size: 18),
-            Text(item['eventDay'] ?? '', style: const TextStyle(fontSize: 9))
+                color: AppColors.emerald, size: 16),
+            Text(item['eventDay'] ?? '', style: const TextStyle(fontSize: 8))
           ])));
 }

@@ -40,29 +40,60 @@ class _HomeShellState extends State<HomeShell> {
     ];
     return Scaffold(
       body: IndexedStack(index: index, children: screens),
-      floatingActionButton: FloatingActionButton.large(
+      floatingActionButton: FloatingActionButton(
         onPressed: openScanner,
         backgroundColor: AppColors.gold,
         foregroundColor: AppColors.navy,
-        elevation: 8,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        child: const Icon(Icons.qr_code_scanner_rounded, size: 32),
+        elevation: 5,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        child: const Icon(Icons.qr_code_scanner_rounded, size: 27),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: NavigationBar(
-        height: 74,
-        selectedIndex: index,
-        onDestinationSelected: (value) => setState(() => index = value),
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.space_dashboard_outlined),
-              selectedIcon: Icon(Icons.space_dashboard_rounded),
-              label: 'Overview'),
-          NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long_rounded),
-              label: 'Attendance'),
-        ],
+      bottomNavigationBar: BottomAppBar(
+        height: 66,
+        color: AppColors.navy,
+        elevation: 12,
+        padding: EdgeInsets.zero,
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8,
+        child: Row(children: [
+          Expanded(
+              child: _navItem(0, 'Overview', Icons.grid_view_outlined,
+                  Icons.grid_view_rounded)),
+          const SizedBox(width: 72),
+          Expanded(
+              child: _navItem(1, 'Attendance', Icons.fact_check_outlined,
+                  Icons.fact_check_rounded)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _navItem(
+      int value, String label, IconData icon, IconData selectedIcon) {
+    final selected = index == value;
+    return InkWell(
+      onTap: () => setState(() => index = value),
+      child: SizedBox.expand(
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(selected ? selectedIcon : icon,
+              size: 21, color: selected ? AppColors.gold : Colors.white54),
+          const SizedBox(height: 3),
+          Text(label,
+              style: TextStyle(
+                  color: selected ? AppColors.gold : Colors.white54,
+                  fontSize: 9,
+                  letterSpacing: .3,
+                  fontWeight: selected ? FontWeight.w900 : FontWeight.w600)),
+          const SizedBox(height: 3),
+          AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: selected ? 18 : 0,
+              height: 2,
+              decoration: BoxDecoration(
+                  color: AppColors.gold,
+                  borderRadius: BorderRadius.circular(2)))
+        ]),
       ),
     );
   }
