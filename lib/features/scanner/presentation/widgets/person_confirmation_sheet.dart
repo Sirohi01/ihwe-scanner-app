@@ -201,13 +201,16 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
       width: 96,
       height: 112,
       decoration: BoxDecoration(
-          color: AppColors.navy,
+          color: p.photoKind == 'logo' ? Colors.white : AppColors.navy,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: AppColors.gold, width: 2)),
       clipBehavior: Clip.antiAlias,
       child: p.photoUrl.isNotEmpty
-          ? Image.network(p.photoUrl,
-              fit: BoxFit.cover, errorBuilder: (_, __, ___) => _initial(p))
+          ? Padding(
+              padding: EdgeInsets.all(p.photoKind == 'logo' ? 7 : 0),
+              child: Image.network(p.photoUrl,
+                  fit: p.photoKind == 'logo' ? BoxFit.contain : BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _initial(p)))
           : _initial(p));
 
   Color _typeColor(String type) => type == 'visitor'

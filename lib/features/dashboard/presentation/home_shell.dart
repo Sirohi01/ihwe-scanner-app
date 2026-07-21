@@ -40,27 +40,27 @@ class _HomeShellState extends State<HomeShell> {
     ];
     return Scaffold(
       body: IndexedStack(index: index, children: screens),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.small(
         onPressed: openScanner,
         backgroundColor: AppColors.gold,
         foregroundColor: AppColors.navy,
         elevation: 5,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: const Icon(Icons.qr_code_scanner_rounded, size: 27),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        child: const Icon(Icons.qr_code_scanner_rounded, size: 23),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
-        height: 66,
+        height: 56,
         color: AppColors.navy,
         elevation: 12,
         padding: EdgeInsets.zero,
         shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
+        notchMargin: 6,
         child: Row(children: [
           Expanded(
               child: _navItem(0, 'Overview', Icons.grid_view_outlined,
                   Icons.grid_view_rounded)),
-          const SizedBox(width: 72),
+          const SizedBox(width: 60),
           Expanded(
               child: _navItem(1, 'Attendance', Icons.fact_check_outlined,
                   Icons.fact_check_rounded)),
@@ -77,15 +77,15 @@ class _HomeShellState extends State<HomeShell> {
       child: SizedBox.expand(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(selected ? selectedIcon : icon,
-              size: 21, color: selected ? AppColors.gold : Colors.white54),
-          const SizedBox(height: 3),
+              size: 19, color: selected ? AppColors.gold : Colors.white54),
+          const SizedBox(height: 2),
           Text(label,
               style: TextStyle(
                   color: selected ? AppColors.gold : Colors.white54,
-                  fontSize: 9,
+                  fontSize: 8.5,
                   letterSpacing: .3,
                   fontWeight: selected ? FontWeight.w900 : FontWeight.w600)),
-          const SizedBox(height: 3),
+          const SizedBox(height: 2),
           AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               width: selected ? 18 : 0,

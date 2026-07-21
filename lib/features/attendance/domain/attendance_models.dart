@@ -11,6 +11,7 @@ class PersonProfile {
         mobile = json['mobile']?.toString() ?? '',
         country = json['country']?.toString() ?? '',
         photoUrl = json['photoUrl']?.toString() ?? '',
+        photoKind = json['photoKind']?.toString() ?? 'person',
         status = json['status']?.toString() ?? '';
   final String id,
       type,
@@ -23,6 +24,7 @@ class PersonProfile {
       mobile,
       country,
       photoUrl,
+      photoKind,
       status;
 }
 

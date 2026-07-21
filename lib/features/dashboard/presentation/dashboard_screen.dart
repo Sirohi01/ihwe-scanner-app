@@ -4,6 +4,8 @@ import '../../../core/storage/session_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/domain/attendance_categories.dart';
+import '../../attendance/presentation/attendance_profile_screen.dart';
+import 'company_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen(
@@ -177,6 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final attended = Map<String, dynamic>.from(data!['attended']);
     final days = List<String>.from(data!['days']);
     final recent = List<Map<String, dynamic>>.from(data!['recent']);
+    final companies = List<Map<String, dynamic>>.from(data!['companies'] ?? []);
     final registeredBySubType =
         Map<String, dynamic>.from(registered['bySubType'] ?? {});
     final attendedBySubType =
@@ -304,6 +307,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             registeredBySubType[item.value] ?? 0,
                             item.parent))
                         .toList()),
+                if (selectedType.isEmpty || selectedType == 'exhibitor') ...[
+                  const SizedBox(height: 9),
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('COMPANY-WISE ATTENDANCE',
+                            style: TextStyle(
+                                fontSize: 11,
+                                letterSpacing: 1.4,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.black45)),
+                        Text('${companies.length} present',
+                            style: const TextStyle(
+                                fontSize: 10, color: Colors.black38))
+                      ]),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 90,
+                    child: companies.isEmpty
+                        ? Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: Colors.black12),
+                            ),
+                            child: const Row(children: [
+                              Icon(Icons.storefront_outlined,
+                                  color: Colors.black38, size: 22),
+                              SizedBox(width: 9),
+                              Expanded(
+                                child: Text(
+                                  'No exhibitor company attendance yet. Scan a Stall Information or Exhibitor Pass QR.',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.black45,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ]),
+                          )
+                        : ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: companies.length,
+                            itemBuilder: (_, i) => _companyStat(companies[i]),
+                          ),
+                  ),
+                ],
                 const SizedBox(height: 9),
                 Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -321,7 +373,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ]))),
       SliverPadding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 105),
-          sliver: SliverList.builder(
+          sliver: SliverFixedExtentList.builder(
+              itemExtent: 63,
               itemCount: recent.length,
               itemBuilder: (_, i) => _recent(recent[i]))),
     ];
@@ -451,6 +504,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           fontWeight: FontWeight.w700))
                 ])
               ])));
+
+  Widget _companyStat(Map<String, dynamic> item) => GestureDetector(
+      onTap: () {
+        final companyId = item['companyId']?.toString() ?? '';
+        if (companyId.length != 24 || companyId == 'null') return;
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => CompanyDetailScreen(
+                companyId: companyId, repository: widget.repository)));
+      },
+      child: Container(
+      width: 190,
+      margin: const EdgeInsets.only(right: 7),
+      child: Card(
+          child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item['company']?.toString() ?? 'Company',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w900)),
+                    const Spacer(),
+                    Row(children: [
+                      Icon(
+                          item['companyAttendance'] == 1
+                              ? Icons.verified_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          size: 14,
+                          color: item['companyAttendance'] == 1
+                              ? AppColors.emerald
+                              : Colors.black26),
+                      const SizedBox(width: 4),
+                      Text('${item['passPeople'] ?? 0} pass arrivals',
+                          style: const TextStyle(
+                              fontSize: 9, fontWeight: FontWeight.w700)),
+                    ]),
+                    const SizedBox(height: 3),
+                    const Row(children: [
+                      Text('VIEW PROFILE',
+                          style: TextStyle(
+                              color: AppColors.green,
+                              fontSize: 8,
+                              letterSpacing: .7,
+                              fontWeight: FontWeight.w900)),
+                      SizedBox(width: 2),
+                      Icon(Icons.arrow_forward_rounded,
+                          color: AppColors.green, size: 12),
+                    ])
+                  ])))));
   Widget _progress(num present, num total) {
     final ratio = total == 0 ? 0.0 : (present / total).clamp(0, 1).toDouble();
     return Card(
@@ -496,34 +600,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: const TextStyle(
                         fontSize: 9, fontWeight: FontWeight.w800))
               ])));
-  Widget _recent(Map<String, dynamic> item) => Card(
-      margin: const EdgeInsets.only(bottom: 7),
-      child: ListTile(
-          dense: true,
-          visualDensity: const VisualDensity(vertical: -2),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 11, vertical: 1),
-          leading: CircleAvatar(
-              radius: 18,
-              backgroundColor: AppColors.green.withValues(alpha: .1),
-              foregroundColor: AppColors.green,
-              child: Text((item['name']?.toString().trim().isNotEmpty == true
-                      ? item['name'].toString()[0]
-                      : '?')
-                  .toUpperCase())),
-          title: Text(
-              item['name']?.toString().isNotEmpty == true
-                  ? item['name']
-                  : item['registrationId'],
-              maxLines: 1,
-              style:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-          subtitle: Text('${item['subjectType']} • ${item['registrationId']}',
-              maxLines: 1),
-          trailing:
-              Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            const Icon(Icons.check_circle_rounded,
-                color: AppColors.emerald, size: 16),
-            Text(item['eventDay'] ?? '', style: const TextStyle(fontSize: 8))
-          ])));
+  Widget _recent(Map<String, dynamic> item) {
+    final subjectType = item['subjectType']?.toString() ?? '';
+    final company = item['company']?.toString() ?? '';
+    final isPass = item['attendanceKind'] == 'pass';
+    final isCompanyEntry = subjectType == 'exhibitor' && !isPass;
+    final rawName = item['name']?.toString() ?? '';
+    final baseName = isCompanyEntry && company.isNotEmpty
+        ? company
+        : (rawName.isNotEmpty
+            ? rawName
+            : item['registrationId']?.toString() ?? '-');
+    final displayName =
+        isPass && company.isNotEmpty ? '$baseName — $company' : baseName;
+    final photoUrl = item['photoUrl']?.toString() ?? '';
+    return Card(
+        margin: const EdgeInsets.only(bottom: 7),
+        child: ListTile(
+            onTap: () {
+              final attendanceId = item['_id']?.toString() ?? '';
+              final companyId = item['companyId']?.toString() ?? '';
+              if (isCompanyEntry && companyId.length == 24) {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => CompanyDetailScreen(
+                        companyId: companyId,
+                        repository: widget.repository)));
+              } else if (attendanceId.length == 24) {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => AttendanceProfileScreen(
+                        attendanceId: attendanceId,
+                        repository: widget.repository)));
+              }
+            },
+            dense: true,
+            visualDensity: const VisualDensity(vertical: -2),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 11, vertical: 1),
+            leading: CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.green.withValues(alpha: .1),
+                foregroundColor: AppColors.green,
+                backgroundImage:
+                    photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                child: photoUrl.isEmpty
+                    ? Text((displayName.isNotEmpty ? displayName[0] : '?')
+                        .toUpperCase())
+                    : null),
+            title: Text(displayName,
+                maxLines: 1,
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+            subtitle: Text('${item['subjectType']} • ${item['registrationId']}',
+                maxLines: 1),
+            trailing:
+                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(Icons.check_circle_rounded,
+                  color: AppColors.emerald, size: 16),
+              Text(item['eventDay'] ?? '', style: const TextStyle(fontSize: 8))
+            ])));
+  }
 }
