@@ -239,7 +239,7 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
               ? _removeAttendance(item)
               : _correctAttendance(item),
           itemBuilder: (_) => const [
-            PopupMenuItem(value: 'correct', child: Text('Correct day / gate')),
+            PopupMenuItem(value: 'correct', child: Text('Correct event day')),
             PopupMenuItem(value: 'remove', child: Text('Remove attendance')),
           ],
         ),
@@ -249,7 +249,6 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
 
   Future<void> _correctAttendance(Map<String, dynamic> item) async {
     final reason = TextEditingController();
-    final gate = TextEditingController(text: item['gate']?.toString() ?? '');
     final days = List<String>.from(data?['days'] ?? []);
     String selectedDay = item['eventDay']?.toString() ?? '';
     final confirmed = await showDialog<bool>(
@@ -272,10 +271,6 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
                             () => selectedDay = value ?? selectedDay)),
                     const SizedBox(height: 9),
                     TextField(
-                        controller: gate,
-                        decoration: const InputDecoration(labelText: 'Gate')),
-                    const SizedBox(height: 9),
-                    TextField(
                         controller: reason,
                         maxLines: 2,
                         decoration: const InputDecoration(
@@ -293,11 +288,10 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
                 )));
     if (confirmed == true) {
       await widget.repository.correctAttendance(item['_id'].toString(),
-          reason: reason.text.trim(), day: selectedDay, gate: gate.text);
+          reason: reason.text.trim(), day: selectedDay);
       await load();
     }
     reason.dispose();
-    gate.dispose();
   }
 
   Future<void> _removeAttendance(Map<String, dynamic> item) async {
