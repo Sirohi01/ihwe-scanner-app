@@ -11,20 +11,12 @@ class AuthRepository {
         .post('/login', {'username': username.trim(), 'password': password});
     final admin = Map<String, dynamic>.from(result['admin'] ?? {});
     final role = admin['role']?.toString() ?? '';
-    final normalized =
-        role.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
-    const allowed = {
-      'admin',
-      'super-admin',
-      'super-administrator',
-      'ihwe-super-administrator'
-    };
-    if (!allowed.contains(normalized)) {
-      throw ApiException(
-          'Only an authorised IHWE administrator can use this app.', 403);
+    final token = result['token']?.toString() ?? '';
+    if (token.isEmpty || admin.isEmpty) {
+      throw ApiException('Unable to create a valid user session.', 401);
     }
     await session.save(
-        newToken: result['token'],
+        newToken: token,
         newUsername: admin['fullName']?.toString().isNotEmpty == true
             ? admin['fullName']
             : admin['username'],

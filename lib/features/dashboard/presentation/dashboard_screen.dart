@@ -141,13 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     padding: EdgeInsets.zero),
                 icon: const Icon(Icons.logout_rounded, size: 18)),
           ]),
-          const SizedBox(height: 14),
-          const Text('Live Attendance',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900)),
-          const SizedBox(height: 4),
+          const SizedBox(height: 11),
           Text(
               data?['event']?['name'] ?? 'International Health & Wellness Expo',
               style: TextStyle(
