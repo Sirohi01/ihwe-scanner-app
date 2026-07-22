@@ -56,6 +56,7 @@ class ApiClient {
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
         if (session.token != null) 'Authorization': 'Bearer ${session.token}',
       };
 

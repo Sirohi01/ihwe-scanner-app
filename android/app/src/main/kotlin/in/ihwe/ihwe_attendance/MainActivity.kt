@@ -25,14 +25,18 @@ class MainActivity : FlutterActivity() {
                 }
                 val filename = call.argument<String>("filename")
                 val bytes = call.argument<ByteArray>("bytes")
+                val mimeType = call.argument<String>("mimeType") ?: when {
+                    filename?.lowercase()?.endsWith(".pdf") == true -> "application/pdf"
+                    else -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                }
                 if (filename.isNullOrBlank() || bytes == null || bytes.isEmpty()) {
-                    result.error("INVALID_FILE", "The exported Excel file is empty.", null)
+                    result.error("INVALID_FILE", "The exported report file is empty.", null)
                     return@setMethodCallHandler
                 }
                 try {
                     val values = ContentValues().apply {
                         put(MediaStore.Downloads.DISPLAY_NAME, filename)
-                        put(MediaStore.Downloads.MIME_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                        put(MediaStore.Downloads.MIME_TYPE, mimeType)
                         put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/IHWE Attendance")
                         put(MediaStore.Downloads.IS_PENDING, 1)
                     }
@@ -46,7 +50,7 @@ class MainActivity : FlutterActivity() {
                     resolver.update(uri, values, null, null)
                     result.success("Downloads/IHWE Attendance/$filename")
                 } catch (error: Exception) {
-                    result.error("SAVE_FAILED", error.message ?: "Excel download failed.", null)
+                    result.error("SAVE_FAILED", error.message ?: "Report download failed.", null)
                 }
             }
     }

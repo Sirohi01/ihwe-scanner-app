@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_skeleton.dart';
 import '../../attendance/data/attendance_repository.dart';
+import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/ai_summary_dialog.dart';
 import 'employee_operations_screen.dart';
 
@@ -18,8 +21,9 @@ class OperationsScreen extends StatefulWidget {
 
 class _OperationsScreenState extends State<OperationsScreen> {
   Map<String, dynamic>? alerts, insights, operations;
+  String? aiInsightSummary;
+  Object? aiInsightError;
   Object? error;
-  bool exporting = false;
   bool get superAdmin {
     final role = widget.session.role
         .toLowerCase()
@@ -48,6 +52,12 @@ class _OperationsScreenState extends State<OperationsScreen> {
           error = null;
         });
       }
+      try {
+        final summary = await widget.repository.aiSummary('exhibition');
+        if (mounted) setState(() => aiInsightSummary = summary);
+      } catch (value) {
+        if (mounted) setState(() => aiInsightError = value);
+      }
     } catch (e) {
       if (mounted) setState(() => error = e);
     }
@@ -55,7 +65,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-      length: superAdmin ? 4 : 3,
+      length: superAdmin ? 3 : 2,
       child: Scaffold(
           appBar: AppBar(
               backgroundColor: AppColors.navy,
@@ -93,9 +103,8 @@ class _OperationsScreenState extends State<OperationsScreen> {
                   indicatorWeight: 3,
                   tabs: [
                     const Tab(text: 'ALERTS'),
-                    const Tab(text: 'INSIGHTS'),
-                    const Tab(text: 'REPORTS'),
-                    if (superAdmin) const Tab(text: 'EMPLOYEES')
+                    if (superAdmin) const Tab(text: 'EMPLOYEES'),
+                    const Tab(text: 'INSIGHTS')
                   ])),
           body: alerts == null
               ? Center(
@@ -105,9 +114,8 @@ class _OperationsScreenState extends State<OperationsScreen> {
                           onPressed: load, child: Text('Retry: $error')))
               : TabBarView(children: [
                   _alerts(),
-                  _insights(),
-                  _reports(),
-                  if (superAdmin) _employees()
+                  if (superAdmin) _employees(),
+                  _insights()
                 ])));
   Widget _alerts() {
     final target = Map<String, dynamic>.from(alerts!['dailyTarget'] ?? {}),
@@ -122,18 +130,35 @@ class _OperationsScreenState extends State<OperationsScreen> {
               child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(children: [
-                    Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                              '${target['achieved'] ?? 0}/${target['target'] ?? 0}',
-                              style: const TextStyle(
-                                  fontSize: 22, fontWeight: FontWeight.w900)),
-                          Text('${target['percent'] ?? 0}%',
-                              style: const TextStyle(
-                                  color: AppColors.green,
-                                  fontWeight: FontWeight.w900))
-                        ]),
+                    Row(children: [
+                      Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                  '${target['achieved'] ?? 0}/${target['target'] ?? 0}',
+                                  style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900)),
+                              Text(
+                                  target['isEventDay'] == true
+                                      ? 'Today • ${target['day'] ?? ''}'
+                                      : 'Today is outside the exhibition dates',
+                                  style: const TextStyle(
+                                      fontSize: 9, color: Colors.black45)),
+                            ]),
+                      ),
+                      Text('${target['percent'] ?? 0}%',
+                          style: const TextStyle(
+                              color: AppColors.green,
+                              fontWeight: FontWeight.w900)),
+                      IconButton(
+                          tooltip: 'Set daily target',
+                          onPressed: () => _editDailyTarget(
+                              numberValue(target['target']).round()),
+                          icon: const Icon(Icons.track_changes_rounded,
+                              size: 19, color: AppColors.green))
+                    ]),
                     const SizedBox(height: 8),
                     LinearProgressIndicator(
                         value:
@@ -162,85 +187,380 @@ class _OperationsScreenState extends State<OperationsScreen> {
   }
 
   double numberValue(dynamic v) => double.tryParse(v?.toString() ?? '0') ?? 0;
+
+  Future<void> _editDailyTarget(int current) async {
+    final controller = TextEditingController(text: '$current');
+    final value = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Set daily target'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+              labelText: 'Expected check-ins per day',
+              prefixIcon: Icon(Icons.track_changes_rounded)),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(
+                  dialogContext, int.tryParse(controller.text.trim())),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null || value < 1) return;
+    try {
+      await widget.repository.updateDailyTarget(value);
+      await load();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Target update failed: $error')));
+      }
+    }
+  }
+
   Widget _insights() {
     final countries = List.from(insights!['countries'] ?? []),
         types = List.from(insights!['buyerTypes'] ?? []),
         matches = List.from(insights!['visitorTypes'] ?? []),
+        days = List.from(insights!['dayWise'] ?? []),
+        categories = List.from(insights!['categoryWise'] ?? []),
+        overview = Map<String, dynamic>.from(insights!['overview'] ?? {}),
         exhibitors = Map<String, dynamic>.from(insights!['exhibitors'] ?? {});
-    return ListView(padding: const EdgeInsets.all(14), children: [
-      _title('BUYER MIX'),
-      Row(
-          children: types
-              .map((e) => Expanded(
-                  child: Card(
-                      child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(children: [
-                            Text('${e['count']}',
-                                style: const TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.w900)),
-                            Text('${e['label']}',
-                                style: const TextStyle(fontSize: 10))
-                          ])))))
-              .toList()),
-      const SizedBox(height: 14),
-      _title('TOP COUNTRIES'),
-      ...countries.take(8).map((e) => ListTile(
-          dense: true,
-          title: Text(e['label']),
-          trailing: Text('${e['count']}',
-              style: const TextStyle(fontWeight: FontWeight.w900)))),
-      const SizedBox(height: 12),
-      _title('VISITOR INSIGHTS'),
-      ...matches.map((e) => ListTile(
-          dense: true,
-          leading: const Icon(Icons.groups_rounded, color: AppColors.green),
-          title:
-              Text((e['label'] ?? 'Visitor').toString().replaceAll('-', ' ')),
-          trailing: Text('${e['count'] ?? 0}',
-              style: const TextStyle(fontWeight: FontWeight.w900)))),
-      const SizedBox(height: 12),
-      _title('EXHIBITOR INSIGHTS'),
-      Row(children: [
-        Expanded(
-            child: _insightCard('Companies present',
-                exhibitors['presentCompanies'], Icons.storefront_rounded)),
-        const SizedBox(width: 7),
-        Expanded(
-            child: _insightCard('Team check-ins', exhibitors['teamCheckIns'],
-                Icons.badge_rounded)),
-        const SizedBox(width: 7),
-        Expanded(
-            child: _insightCard(
-                'Products', exhibitors['products'], Icons.inventory_2_rounded))
+    return RefreshIndicator(
+      onRefresh: load,
+      child: ListView(padding: const EdgeInsets.all(14), children: [
+        _title('EXHIBITION OVERVIEW'),
+        Row(children: [
+          Expanded(
+              child: _insightCard('Check-ins', overview['totalCheckIns'],
+                  Icons.how_to_reg_rounded)),
+          const SizedBox(width: 6),
+          Expanded(
+              child: _insightCard('Unique', overview['uniquePeople'],
+                  Icons.people_alt_rounded)),
+          const SizedBox(width: 6),
+          Expanded(
+              child: _insightCard('Companies', overview['exhibitorCompanies'],
+                  Icons.storefront_rounded)),
+        ]),
+        _title('DAY-WISE ATTENDANCE'),
+        _verticalBarChart(days, labelKey: 'day', valueKey: 'total'),
+        const SizedBox(height: 14),
+        _title('ATTENDANCE BY CATEGORY'),
+        _donutChart(categories, labelKey: 'label', valueKey: 'count'),
+        const SizedBox(height: 14),
+        _title('BUYER MIX'),
+        _donutChart(types, labelKey: 'label', valueKey: 'count'),
+        const SizedBox(height: 14),
+        _title('TOP COUNTRIES'),
+        _chartCard(countries.take(8).toList(),
+            labelKey: 'label', valueKey: 'count'),
+        const SizedBox(height: 14),
+        _title('VISITOR BREAKDOWN'),
+        _visualTiles(matches, labelKey: 'label', valueKey: 'count'),
+        const SizedBox(height: 14),
+        _title('EXHIBITOR PERFORMANCE'),
+        Row(children: [
+          Expanded(
+              child: _insightCard('Present', exhibitors['presentCompanies'],
+                  Icons.storefront_rounded)),
+          const SizedBox(width: 7),
+          Expanded(
+              child: _insightCard('Team entries', exhibitors['teamCheckIns'],
+                  Icons.badge_rounded)),
+          const SizedBox(width: 7),
+          Expanded(
+              child: _insightCard('Products', exhibitors['products'],
+                  Icons.inventory_2_rounded))
+        ]),
+        const SizedBox(height: 8),
+        _chartCard(List.from(exhibitors['topCompanies'] ?? []),
+            labelKey: 'label', valueKey: 'checkIns', sentenceLabels: false),
+        const SizedBox(height: 16),
+        _title('AI EXECUTIVE SUMMARY'),
+        _aiSummaryCard(),
       ]),
-      const SizedBox(height: 8),
-      ...List.from(exhibitors['topCompanies'] ?? []).map((e) => ListTile(
-          dense: true,
-          title: Text(e['label'] ?? 'Company',
-              style: const TextStyle(fontWeight: FontWeight.w800)),
-          subtitle: Text('${e['members'] ?? 0} members'),
-          trailing: Text('${e['checkIns'] ?? 0}',
-              style: const TextStyle(fontWeight: FontWeight.w900))))
-    ]);
+    );
   }
 
-  Widget _reports() => ListView(padding: const EdgeInsets.all(14), children: [
-        _title('EXPORT CENTRE'),
-        const Text(
-            'Overall, day-wise, category-wise and company-wise coloured Excel reports. PDF includes generated date/time and active filters.'),
-        const SizedBox(height: 14),
-        _exportButton('Overall Excel', Icons.table_view_rounded,
-            () => widget.repository.exportAttendance()),
-        _exportButton('Visitor Excel', Icons.groups_rounded,
-            () => widget.repository.exportAttendance(type: 'visitor')),
-        _exportButton('Buyer Excel', Icons.handshake_rounded,
-            () => widget.repository.exportAttendance(type: 'buyer')),
-        _exportButton('Company-wise Excel', Icons.storefront_rounded,
-            () => widget.repository.exportAttendance(type: 'exhibitor')),
-        _exportButton('Exhibition PDF Summary', Icons.picture_as_pdf_rounded,
-            () => widget.repository.exportPdf())
-      ]);
+  Widget _aiSummaryCard() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [
+            AppColors.navy,
+            AppColors.green.withValues(alpha: .94),
+          ]),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x22071B33), blurRadius: 14, offset: Offset(0, 6))
+          ],
+        ),
+        child: aiInsightSummary == null
+            ? Row(children: [
+                const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.gold)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Text(
+                        aiInsightError == null
+                            ? 'AI is analysing the complete exhibition...'
+                            : 'AI summary unavailable: $aiInsightError',
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 10))),
+                if (aiInsightError != null)
+                  IconButton(
+                      onPressed: load,
+                      icon: const Icon(Icons.refresh_rounded,
+                          color: Colors.white)),
+              ])
+            : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Row(children: [
+                  Icon(Icons.auto_awesome_rounded,
+                      color: AppColors.gold, size: 18),
+                  SizedBox(width: 7),
+                  Text('LIVE AI ANALYSIS',
+                      style: TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: .8))
+                ]),
+                const SizedBox(height: 10),
+                Text(aiInsightSummary!.replaceAll(RegExp(r'[#*]'), '').trim(),
+                    style: const TextStyle(
+                        color: Colors.white, fontSize: 10.5, height: 1.48)),
+              ]),
+      );
+
+  static const _chartColors = [
+    AppColors.green,
+    AppColors.gold,
+    Color(0xFF3D7FC1),
+    Color(0xFF9B59B6),
+    Color(0xFFE67E22),
+    Color(0xFF16A085),
+  ];
+
+  Widget _verticalBarChart(List<dynamic> items,
+      {required String labelKey, required String valueKey}) {
+    if (items.isEmpty) return _emptyChart();
+    final values = items.map((item) => numberValue(item[valueKey])).toList();
+    final maxValue = values.fold<double>(1, math.max);
+    return Card(
+      child: SizedBox(
+        height: 176,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: List.generate(items.length, (index) {
+              final item = Map<String, dynamic>.from(items[index]);
+              final value = values[index];
+              final rawLabel = (item[labelKey] ?? '').toString();
+              final label = rawLabel.length >= 10
+                  ? rawLabel.substring(8).replaceFirst('-', ' Aug ')
+                  : rawLabel;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text('${value.round()}',
+                            style: const TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 5),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 450),
+                          height: math.max(8, 105 * value / maxValue),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [AppColors.green, Color(0xFF69A45B)]),
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(9)),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(label,
+                            maxLines: 1,
+                            style: const TextStyle(
+                                fontSize: 8, fontWeight: FontWeight.w700)),
+                      ]),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _donutChart(List<dynamic> items,
+      {required String labelKey, required String valueKey}) {
+    if (items.isEmpty) return _emptyChart();
+    final visible =
+        items.take(6).map((e) => Map<String, dynamic>.from(e)).toList();
+    final values = visible.map((e) => numberValue(e[valueKey])).toList();
+    final total = values.fold<double>(0, (sum, value) => sum + value);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(children: [
+          SizedBox.square(
+            dimension: 118,
+            child: Stack(alignment: Alignment.center, children: [
+              CustomPaint(
+                  size: const Size.square(118),
+                  painter: _DonutPainter(values, _chartColors)),
+              Column(mainAxisSize: MainAxisSize.min, children: [
+                Text('${total.round()}',
+                    style: const TextStyle(
+                        fontSize: 19, fontWeight: FontWeight.w900)),
+                const Text('TOTAL',
+                    style: TextStyle(
+                        fontSize: 7,
+                        color: Colors.black45,
+                        fontWeight: FontWeight.w800)),
+              ]),
+            ]),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+                children: List.generate(visible.length, (index) {
+              final label = sentenceCase(visible[index][labelKey] ?? 'Unknown');
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(children: [
+                  Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                          color: _chartColors[index % _chartColors.length],
+                          shape: BoxShape.circle)),
+                  const SizedBox(width: 7),
+                  Expanded(
+                      child: Text(label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 9))),
+                  Text('${values[index].round()}',
+                      style: const TextStyle(
+                          fontSize: 9, fontWeight: FontWeight.w900)),
+                ]),
+              );
+            })),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _visualTiles(List<dynamic> items,
+      {required String labelKey, required String valueKey}) {
+    if (items.isEmpty) return _emptyChart();
+    return Wrap(
+      spacing: 7,
+      runSpacing: 7,
+      children: items.take(8).toList().asMap().entries.map((entry) {
+        final item = Map<String, dynamic>.from(entry.value);
+        final color = _chartColors[entry.key % _chartColors.length];
+        return Container(
+          width: (MediaQuery.sizeOf(context).width - 43) / 2,
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+          decoration: BoxDecoration(
+              color: color.withValues(alpha: .09),
+              border: Border.all(color: color.withValues(alpha: .25)),
+              borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            CircleAvatar(
+                radius: 15,
+                backgroundColor: color.withValues(alpha: .16),
+                child: Icon(Icons.groups_rounded, size: 15, color: color)),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(sentenceCase(item[labelKey] ?? 'Visitor'),
+                    maxLines: 2,
+                    style: const TextStyle(
+                        fontSize: 9, fontWeight: FontWeight.w700))),
+            Text('${item[valueKey] ?? 0}',
+                style: TextStyle(
+                    color: color, fontSize: 14, fontWeight: FontWeight.w900)),
+          ]),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _emptyChart() => const Card(
+      child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('No data available yet.',
+              style: TextStyle(color: Colors.black45))));
+
+  Widget _chartCard(List<dynamic> items,
+      {required String labelKey,
+      required String valueKey,
+      bool sentenceLabels = true}) {
+    if (items.isEmpty) {
+      return _emptyChart();
+    }
+    final maxValue = items
+        .map((item) => numberValue(item[valueKey]))
+        .fold<double>(1, (a, b) => a > b ? a : b);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+            children: items.take(10).map((raw) {
+          final item = Map<String, dynamic>.from(raw);
+          final value = numberValue(item[valueKey]);
+          final rawLabel = item[labelKey] ?? 'Unknown';
+          final label = sentenceLabels ? sentenceCase(rawLabel) : '$rawLabel';
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 9),
+            child: Column(children: [
+              Row(children: [
+                Expanded(
+                    child: Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 9.5, fontWeight: FontWeight.w700))),
+                Text('${value.round()}',
+                    style: const TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.w900)),
+              ]),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: LinearProgressIndicator(
+                    value: (value / maxValue).clamp(0, 1),
+                    minHeight: 7,
+                    backgroundColor: AppColors.green.withValues(alpha: .08),
+                    color: AppColors.green),
+              ),
+            ]),
+          );
+        }).toList()),
+      ),
+    );
+  }
+
   Widget _employees() {
     final users = List.from(operations?['employees'] ?? []);
     return ListView.builder(
@@ -282,32 +602,6 @@ class _OperationsScreenState extends State<OperationsScreen> {
         });
   }
 
-  Widget _exportButton(
-          String label, IconData icon, Future<String> Function() action) =>
-      Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: FilledButton.icon(
-              onPressed: exporting
-                  ? null
-                  : () async {
-                      setState(() => exporting = true);
-                      try {
-                        final path = await action();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Saved: $path')));
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Export failed: $e')));
-                        }
-                      } finally {
-                        if (mounted) setState(() => exporting = false);
-                      }
-                    },
-              icon: Icon(icon),
-              label: Text(label)));
   Widget _title(String value) => Padding(
       padding: const EdgeInsets.only(bottom: 7),
       child: Text(value,
@@ -340,7 +634,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
             title: Text(item['name'] ?? 'Special arrival',
                 style: const TextStyle(fontWeight: FontWeight.w900)),
             subtitle: Text(
-                '${item['company'] ?? ''} • ${(item['subjectSubType'] ?? 'VIP').toString().replaceAll('-', ' ')}'),
+                '${item['company'] ?? ''} • ${sentenceCase(item['subjectSubType'] ?? 'VIP')}'),
             trailing: const Icon(Icons.star_rounded, color: AppColors.gold)));
   }
 
@@ -360,4 +654,40 @@ class _OperationsScreenState extends State<OperationsScreen> {
                     color: Colors.black54,
                     fontWeight: FontWeight.w700))
           ])));
+}
+
+class _DonutPainter extends CustomPainter {
+  const _DonutPainter(this.values, this.colors);
+
+  final List<double> values;
+  final List<Color> colors;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final total = values.fold<double>(0, (sum, value) => sum + value);
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 8;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final background = Paint()
+      ..color = const Color(0xFFE8EEEA)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 17;
+    canvas.drawCircle(center, radius, background);
+    if (total <= 0) return;
+    var start = -math.pi / 2;
+    for (var index = 0; index < values.length; index++) {
+      final sweep = (values[index] / total) * math.pi * 2;
+      final paint = Paint()
+        ..color = colors[index % colors.length]
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 17
+        ..strokeCap = StrokeCap.butt;
+      canvas.drawArc(rect, start, math.max(0, sweep - .025), false, paint);
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
+      oldDelegate.values != values || oldDelegate.colors != colors;
 }

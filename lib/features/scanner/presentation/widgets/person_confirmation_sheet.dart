@@ -30,18 +30,60 @@ class PersonConfirmationSheet extends StatefulWidget {
 class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
   final selected = <String>{};
   bool loading = false;
+  bool changingStatus = false;
+  late String buyerStatus;
+
+  bool get isInternationalBuyer =>
+      widget.result.person.subType == 'international-buyer';
+  bool get canMark => !isInternationalBuyer || buyerStatus == 'Approved';
 
   @override
   void initState() {
     super.initState();
+    buyerStatus = widget.result.person.status.isEmpty
+        ? 'Pending'
+        : widget.result.person.status;
     final open = widget.result.days
         .where((day) => !widget.result.attendedDays.contains(day))
         .toList();
-    if (open.isNotEmpty) selected.add(open.first);
+    if (open.isNotEmpty && canMark) selected.add(open.first);
+  }
+
+  Future<void> changeBuyerStatus(String status) async {
+    if (changingStatus || status == buyerStatus) return;
+    setState(() => changingStatus = true);
+    try {
+      final updated = await widget.repository
+          .updateBuyerStatus(widget.result.person.id, status);
+      if (!mounted) return;
+      setState(() {
+        buyerStatus = updated;
+        selected.clear();
+        if (canMark) {
+          final open = widget.result.days
+              .where((day) => !widget.result.attendedDays.contains(day))
+              .toList();
+          if (open.isNotEmpty) selected.add(open.first);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Buyer status changed to $updated.'),
+        backgroundColor:
+            updated == 'Approved' ? AppColors.emerald : Colors.orange.shade800,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => changingStatus = false);
+    }
   }
 
   Future<void> mark() async {
-    if (selected.isEmpty) return;
+    if (!canMark || selected.isEmpty) return;
     setState(() => loading = true);
     try {
       final results = await widget.repository
@@ -111,11 +153,15 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
                         _detail(Icons.phone_outlined, 'Mobile', person.mobile),
                         _detail(
                             Icons.public_rounded, 'Country', person.country),
-                        _detail(
-                            Icons.verified_outlined, 'Status', person.status),
+                        _detail(Icons.verified_outlined, 'Status',
+                            isInternationalBuyer ? buyerStatus : person.status),
                       ]),
                     ),
                   ),
+                  if (isInternationalBuyer) ...[
+                    const SizedBox(height: 10),
+                    _buyerApprovalPanel(),
+                  ],
                   if (widget.result.attendance.isNotEmpty) ...[
                     const SizedBox(height: 10),
                     Container(
@@ -261,6 +307,7 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
       );
 
   void _selectAll() => setState(() {
+        if (!canMark) return;
         selected
           ..clear()
           ..addAll(widget.result.days
@@ -277,7 +324,7 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
         visualDensity: const VisualDensity(vertical: -2),
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
         value: done || checked,
-        onChanged: done
+        onChanged: done || !canMark
             ? null
             : (value) => setState(
                 () => value == true ? selected.add(day) : selected.remove(day)),
@@ -325,17 +372,91 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
           height: 52,
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: loading || selected.isEmpty ? null : mark,
+            onPressed: loading || !canMark || selected.isEmpty ? null : mark,
             icon: loading
                 ? const SizedBox.square(
                     dimension: 19,
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.how_to_reg_rounded, size: 20),
-            label: Text(selected.isEmpty
-                ? 'SELECT AN EVENT DAY'
-                : 'MARK ATTENDANCE • ${selected.length} DAY${selected.length == 1 ? '' : 'S'}'),
+            label: Text(!canMark
+                ? 'APPROVE BUYER TO MARK ATTENDANCE'
+                : selected.isEmpty
+                    ? 'SELECT AN EVENT DAY'
+                    : 'MARK ATTENDANCE • ${selected.length} DAY${selected.length == 1 ? '' : 'S'}'),
           ),
+        ),
+      );
+
+  Widget _buyerApprovalPanel() {
+    final approved = buyerStatus == 'Approved';
+    final rejected = buyerStatus == 'Rejected';
+    final color = approved
+        ? AppColors.emerald
+        : rejected
+            ? Colors.red.shade700
+            : Colors.orange.shade800;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .08),
+        border: Border.all(color: color.withValues(alpha: .45)),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(
+              approved
+                  ? Icons.verified_rounded
+                  : rejected
+                      ? Icons.cancel_rounded
+                      : Icons.pending_rounded,
+              size: 19,
+              color: color),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text('BUYER IS ${buyerStatus.toUpperCase()}',
+                style: TextStyle(
+                    color: color, fontSize: 11, fontWeight: FontWeight.w900)),
+          ),
+          if (changingStatus)
+            SizedBox.square(
+                dimension: 17,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color)),
+        ]),
+        if (!approved) ...[
+          const SizedBox(height: 5),
+          const Text(
+              'Attendance is blocked until this buyer is approved. Verify the buyer and update the status here.',
+              style: TextStyle(fontSize: 9.5, height: 1.35)),
+        ],
+        const SizedBox(height: 9),
+        Row(children: [
+          _statusButton('Approved', Icons.check_rounded, AppColors.emerald),
+          const SizedBox(width: 6),
+          _statusButton('Pending', Icons.schedule_rounded, Colors.orange),
+          const SizedBox(width: 6),
+          _statusButton('Rejected', Icons.close_rounded, Colors.red),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _statusButton(String status, IconData icon, Color color) => Expanded(
+        child: OutlinedButton.icon(
+          onPressed: changingStatus || buyerStatus == status
+              ? null
+              : () => changeBuyerStatus(status),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            foregroundColor: color,
+            side: BorderSide(color: color.withValues(alpha: .45)),
+          ),
+          icon: Icon(icon, size: 14),
+          label: Text(status,
+              style:
+                  const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900)),
         ),
       );
 

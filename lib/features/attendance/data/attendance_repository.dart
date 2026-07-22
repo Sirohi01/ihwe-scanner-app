@@ -22,9 +22,15 @@ class AttendanceRepository {
   Future<Map<String, dynamic>> insights() async => Map<String, dynamic>.from(
       (await api.get('/attendance/insights'))['data']);
 
-  Future<Map<String, dynamic>> notifications({int target = 500}) async =>
-      Map<String, dynamic>.from((await api.get('/attendance/notifications',
-          query: {'target': '$target'}))['data']);
+  Future<Map<String, dynamic>> notifications() async =>
+      Map<String, dynamic>.from(
+          (await api.get('/attendance/notifications'))['data']);
+
+  Future<int> updateDailyTarget(int target) async {
+    final result =
+        await api.patch('/attendance/daily-target', {'target': target});
+    return int.tryParse(result['data']['target'].toString()) ?? target;
+  }
 
   Future<Map<String, dynamic>> superAdminOperations() async =>
       Map<String, dynamic>.from(
@@ -55,6 +61,12 @@ class AttendanceRepository {
     final result = await api
         .post('/attendance/mark', {'raw': raw, 'days': days, 'source': source});
     return List<Map<String, dynamic>>.from(result['data']['results']);
+  }
+
+  Future<String> updateBuyerStatus(String buyerId, String status) async {
+    final result = await api
+        .patch('/attendance/buyers/$buyerId/status', {'status': status});
+    return result['data']['status']?.toString() ?? status;
   }
 
   Future<Map<String, dynamic>> dashboard(
@@ -132,9 +144,15 @@ class AttendanceRepository {
     if (response.bodyBytes.isEmpty) {
       throw ApiException('The server returned an empty Excel file.');
     }
+    if (!_isXlsx(response.bodyBytes)) {
+      throw ApiException(
+          'The server did not return a valid Excel file. Please restart the backend and try again.');
+    }
     final savedPath = await _files.invokeMethod<String>('saveToDownloads', {
       'filename': filename,
       'bytes': response.bodyBytes,
+      'mimeType':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     if (savedPath?.isNotEmpty != true) {
       throw ApiException('Android could not save the Excel file.');
@@ -152,11 +170,34 @@ class AttendanceRepository {
     final filename =
         RegExp(r'filename="?([^";]+)').firstMatch(disposition)?.group(1) ??
             'IHWE-summary.pdf';
-    final saved = await _files.invokeMethod<String>(
-        'saveToDownloads', {'filename': filename, 'bytes': response.bodyBytes});
+    if (!_isPdf(response.bodyBytes)) {
+      throw ApiException(
+          'The server did not return a valid PDF file. Please restart the backend and try again.');
+    }
+    final saved = await _files.invokeMethod<String>('saveToDownloads', {
+      'filename':
+          filename.toLowerCase().endsWith('.pdf') ? filename : '$filename.pdf',
+      'bytes': response.bodyBytes,
+      'mimeType': 'application/pdf',
+    });
     if (saved?.isNotEmpty != true) throw ApiException('Could not save PDF.');
     return saved!;
   }
+
+  bool _isPdf(List<int> bytes) =>
+      bytes.length >= 5 &&
+      bytes[0] == 0x25 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x44 &&
+      bytes[3] == 0x46 &&
+      bytes[4] == 0x2D;
+
+  bool _isXlsx(List<int> bytes) =>
+      bytes.length >= 4 &&
+      bytes[0] == 0x50 &&
+      bytes[1] == 0x4B &&
+      bytes[2] == 0x03 &&
+      bytes[3] == 0x04;
 
   Future<String> aiSummary(String scope, {String? id}) async {
     final result = await api.post('/attendance/ai-summary', {
