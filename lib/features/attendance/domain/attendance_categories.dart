@@ -30,5 +30,23 @@ String attendanceLabel(String value) {
   for (final item in [...attendanceTypes, ...attendanceSubTypes]) {
     if (item.value == value) return item.label;
   }
-  return value.replaceAll('-', ' ');
+  return sentenceCase(value);
+}
+
+String sentenceCase(Object? raw) {
+  final value = raw?.toString().trim().replaceAll(RegExp(r'[-_]+'), ' ') ?? '';
+  if (value.isEmpty) return '';
+  return value.split(RegExp(r'\s+')).map((word) {
+    final lower = word.toLowerCase();
+    const preserved = {
+      'qr': 'QR',
+      'vip': 'VIP',
+      'b2b': 'B2B',
+      'gst': 'GST',
+      'tds': 'TDS',
+      'upi': 'UPI',
+      'id': 'ID'
+    };
+    return preserved[lower] ?? '${lower[0].toUpperCase()}${lower.substring(1)}';
+  }).join(' ');
 }

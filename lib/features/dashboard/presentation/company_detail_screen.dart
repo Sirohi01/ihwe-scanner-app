@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../core/config/app_config.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_skeleton.dart';
@@ -7,6 +8,8 @@ import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/attendance_profile_screen.dart';
 import '../../attendance/presentation/ai_summary_dialog.dart';
+import 'company_resources_screen.dart';
+import 'payment_information_screen.dart';
 
 class CompanyDetailScreen extends StatefulWidget {
   const CompanyDetailScreen({
@@ -56,7 +59,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: const Text('Company Attendance'),
+          title: const Text('Exhibitor Profile'),
           actions: [
             IconButton(
               tooltip: 'AI company summary',
@@ -88,7 +91,8 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
                     : Column(mainAxisSize: MainAxisSize.min, children: [
                         Text('$error'),
                         const SizedBox(height: 10),
-                        FilledButton(onPressed: load, child: const Text('Retry')),
+                        FilledButton(
+                            onPressed: load, child: const Text('Retry')),
                       ]))
             : RefreshIndicator(onRefresh: load, child: _content()),
       );
@@ -132,7 +136,8 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
         List<Map<String, dynamic>>.from(data!['memberAttendance'] ?? []));
     final counts = <String, int>{
       for (final type in passLabels.keys)
-        type: allMemberAttendance.where((item) => _passType(item) == type).length
+        type:
+            allMemberAttendance.where((item) => _passType(item) == type).length
     };
     final memberAttendance = selectedPassType.isEmpty
         ? allMemberAttendance
@@ -147,11 +152,12 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
           margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [AppColors.navy, AppColors.green]),
+            gradient:
+                const LinearGradient(colors: [AppColors.navy, AppColors.green]),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               _companyPhoto(company),
               const SizedBox(width: 10),
@@ -193,18 +199,52 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
                             color: companyDays.contains(day)
                                 ? AppColors.emerald
                                 : Colors.black38),
-                        label: Text(DateFormat('d MMM')
-                            .format(DateTime.parse(day))),
+                        label: Text(
+                            DateFormat('d MMM').format(DateTime.parse(day))),
                       ))
                   .toList(),
             ),
           ]),
         ),
       ),
+      SliverToBoxAdapter(
+        child: SizedBox(
+          height: 50,
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            scrollDirection: Axis.horizontal,
+            children: [
+              _resourceButton(
+                  'Free accessories',
+                  Icons.redeem_rounded,
+                  List<Map<String, dynamic>>.from(
+                      data!['freeAccessories'] ?? []),
+                  'free'),
+              _resourceButton(
+                  'Add-ons',
+                  Icons.add_shopping_cart_rounded,
+                  List<Map<String, dynamic>>.from(
+                      data!['additionalAccessories'] ?? []),
+                  'additional'),
+              _paymentButton(),
+              _resourceButton(
+                  'Products',
+                  Icons.inventory_2_outlined,
+                  List<Map<String, dynamic>>.from(data!['products'] ?? []),
+                  'product'),
+            ],
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        sliver: SliverToBoxAdapter(child: _companyInformation(company)),
+      ),
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 3, 16, 5),
         sliver: SliverToBoxAdapter(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               const Text('PASS-WISE ARRIVALS',
                   style: TextStyle(
@@ -212,7 +252,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
                       letterSpacing: 1.2,
                       fontWeight: FontWeight.w900,
                       color: Colors.black45)),
-              Text('${allMemberAttendance.length} total',
+              Text('${allMemberAttendance.length} Total',
                   style: const TextStyle(
                       fontSize: 10,
                       color: AppColors.green,
@@ -220,14 +260,14 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
             ]),
             const SizedBox(height: 6),
             SizedBox(
-              height: 67,
-              child: ListView.builder(
+              height: 44,
+              child: ListView(
                 scrollDirection: Axis.horizontal,
-                itemCount: passLabels.length,
-                itemBuilder: (_, index) {
-                  final type = passLabels.keys.elementAt(index);
-                  return _passStat(type, counts[type] ?? 0);
-                },
+                children: passLabels.keys
+                    .map((type) => Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: _passStat(type, counts[type] ?? 0)))
+                    .toList(),
               ),
             ),
             const SizedBox(height: 7),
@@ -249,14 +289,15 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
         sliver: SliverToBoxAdapter(
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          child:
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             const Text('PRESENT TEAM MEMBERS',
                 style: TextStyle(
                     fontSize: 11,
                     letterSpacing: 1.2,
                     fontWeight: FontWeight.w900,
                     color: Colors.black45)),
-            Text('${memberAttendance.length} shown',
+            Text('${memberAttendance.length} Shown',
                 style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.green,
@@ -285,14 +326,132 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
     ]);
   }
 
-  List<Map<String, dynamic>> _groupMembers(
-      List<Map<String, dynamic>> records) {
+  Widget _companyInformation(Map<String, dynamic> company) {
+    final stall = Map<String, dynamic>.from(
+        company['stallInformation'] ?? <String, dynamic>{});
+    final stallParts = <String>[
+      if (stall['stallNo']?.toString().isNotEmpty == true)
+        'Stall ${stall['stallNo']}',
+      if (stall['stallSize'] != null) '${stall['stallSize']} sq. m.',
+      if (stall['stallType']?.toString().isNotEmpty == true)
+        stall['stallType'].toString(),
+      if (stall['stallScheme']?.toString().isNotEmpty == true)
+        stall['stallScheme'].toString(),
+      if (stall['dimension']?.toString().isNotEmpty == true)
+        stall['dimension'].toString(),
+    ];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('COMPANY & STALL INFORMATION',
+              style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 1.1,
+                  color: Colors.black45,
+                  fontWeight: FontWeight.w900)),
+          const SizedBox(height: 9),
+          _companyInfoRow(Icons.person_outline_rounded, 'Contact person',
+              company['contactPerson']),
+          _companyInfoRow(
+              Icons.phone_outlined, 'Mobile', company['contactMobile']),
+          _companyInfoRow(
+              Icons.email_outlined, 'Email', company['contactEmail']),
+          _companyInfoRow(Icons.category_outlined, 'Exhibitor category',
+              company['exhibitorCategory']),
+          _companyInfoRow(Icons.factory_outlined, 'Industry / Sector',
+              company['industrySector']),
+          _companyInfoRow(Icons.store_mall_directory_outlined,
+              'Stall information', stallParts.join(' • ')),
+          _companyInfoRow(Icons.signpost_outlined, 'Stall category',
+              stall['stallCategory']),
+          _companyInfoRow(
+              Icons.text_fields_rounded, 'Fascia name', stall['fasciaName']),
+        ]),
+      ),
+    );
+  }
+
+  Widget _companyInfoRow(IconData icon, String label, dynamic raw) {
+    final value = raw?.toString().trim() ?? '';
+    if (value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, size: 16, color: AppColors.green),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 105,
+          child: Text(label,
+              style: const TextStyle(
+                  fontSize: 9,
+                  color: Colors.black45,
+                  fontWeight: FontWeight.w800)),
+        ),
+        Expanded(
+          child: Text(value,
+              style:
+                  const TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
+        ),
+      ]),
+    );
+  }
+
+  Widget _resourceButton(String label, IconData icon,
+          List<Map<String, dynamic>> items, String kind) =>
+      Padding(
+        padding: const EdgeInsets.only(right: 7),
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.white,
+              minimumSize: const Size(0, 40),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(3)),
+              padding: const EdgeInsets.symmetric(horizontal: 10)),
+          onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => CompanyResourcesScreen(
+                      title: label, kind: kind, items: items))),
+          icon: Icon(icon, size: 15, color: AppColors.green),
+          label: Text('$label (${items.length})',
+              style:
+                  const TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
+        ),
+      );
+
+  Widget _paymentButton() => Padding(
+        padding: const EdgeInsets.only(right: 7),
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.white,
+              minimumSize: const Size(0, 40),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(3)),
+              padding: const EdgeInsets.symmetric(horizontal: 10)),
+          onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => PaymentInformationScreen(
+                      data: Map<String, dynamic>.from(
+                          data!['paymentInformation'] ?? {})))),
+          icon: const Icon(Icons.account_balance_wallet_outlined,
+              size: 15, color: AppColors.green),
+          label: const Text('Stall Payment Information',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
+        ),
+      );
+
+  List<Map<String, dynamic>> _groupMembers(List<Map<String, dynamic>> records) {
     final grouped = <String, Map<String, dynamic>>{};
     for (final record in records) {
       final key = record['subjectKey']?.toString() ??
           record['registrationId']?.toString() ??
           '';
-      final current = grouped.putIfAbsent(key, () => {...record, 'days': <String>[]});
+      final current =
+          grouped.putIfAbsent(key, () => {...record, 'days': <String>[]});
       final day = record['eventDay']?.toString() ?? '';
       if (day.isNotEmpty) (current['days'] as List<String>).add(day);
     }
@@ -306,7 +465,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   }
 
   Widget _companyPhoto(Map<String, dynamic> company) {
-    final photo = company['logoUrl']?.toString() ?? '';
+    final photo = resolveApiAssetUrl(company['logoUrl']);
     return Container(
       width: 50,
       height: 50,
@@ -319,37 +478,45 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
       child: photo.isNotEmpty
           ? Image.network(photo,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Icon(
-                  Icons.storefront_rounded,
-                  color: AppColors.green,
-                  size: 27))
+              errorBuilder: (_, __, ___) => const Icon(Icons.storefront_rounded,
+                  color: AppColors.green, size: 27))
           : const Icon(Icons.storefront_rounded,
               color: AppColors.gold, size: 27),
     );
   }
 
-  Widget _passStat(String type, int count) => Container(
-        width: 91,
-        margin: const EdgeInsets.only(right: 6),
+  Widget _passStat(String type, int count) => SizedBox(
+        width: 104,
         child: Card(
           margin: EdgeInsets.zero,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('$count',
-                      style: const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w900)),
-                  const Spacer(),
-                  Text(passLabels[type]!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 9,
-                          color: Colors.black54,
-                          fontWeight: FontWeight.w800)),
-                ]),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            child: Row(children: [
+              Container(
+                width: 27,
+                height: 27,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                    color: AppColors.green.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(7)),
+                child: Text('$count',
+                    style: const TextStyle(
+                        color: AppColors.green,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900)),
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(passLabels[type]!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        height: 1.05,
+                        fontSize: 9,
+                        color: Colors.black54,
+                        fontWeight: FontWeight.w800)),
+              ),
+            ]),
           ),
         ),
       );
@@ -357,10 +524,18 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   Widget _filterChip(String type, String label) => Padding(
         padding: const EdgeInsets.only(right: 6),
         child: ChoiceChip(
+          avatar: selectedPassType == type
+              ? const Icon(Icons.check_circle_rounded,
+                  size: 16, color: AppColors.gold)
+              : null,
           label: Text(label),
           selected: selectedPassType == type,
-          showCheckmark: true,
+          showCheckmark: false,
           selectedColor: AppColors.green,
+          backgroundColor: Colors.white,
+          side: BorderSide(
+              color:
+                  selectedPassType == type ? AppColors.green : Colors.black12),
           labelStyle: TextStyle(
               color: selectedPassType == type ? Colors.white : AppColors.ink,
               fontSize: 10,
@@ -370,7 +545,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
       );
 
   Widget _memberCard(Map<String, dynamic> member) {
-    final photo = member['photoUrl']?.toString() ?? '';
+    final photo = resolveApiAssetUrl(member['photoUrl']);
     final days = List<String>.from(member['days'] ?? []);
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
@@ -391,13 +566,15 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
-        subtitle: Text('${passLabels[_passType(member)] ?? attendanceLabel(member['subjectSubType'] ?? '')} Pass${member['designation']?.toString().isNotEmpty == true ? ' • ${member['designation']}' : ''}',
+        subtitle: Text(
+            '${passLabels[_passType(member)] ?? attendanceLabel(member['subjectSubType'] ?? '')} Pass${member['designation']?.toString().isNotEmpty == true ? ' • ${member['designation']}' : ''}',
             style: const TextStyle(fontSize: 9)),
         trailing: Text(
             days.isEmpty
                 ? '-'
                 : days
-                    .map((day) => DateFormat('d MMM').format(DateTime.parse(day)))
+                    .map((day) =>
+                        DateFormat('d MMM').format(DateTime.parse(day)))
                     .join(', '),
             style: const TextStyle(
                 color: AppColors.emerald,
@@ -418,10 +595,8 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
         child: photo.isNotEmpty
             ? Image.network(photo,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(
-                    Icons.person_rounded,
-                    color: AppColors.green,
-                    size: 20))
+                errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded,
+                    color: AppColors.green, size: 20))
             : const Icon(Icons.person_rounded,
                 color: AppColors.green, size: 20),
       );

@@ -9,6 +9,8 @@ import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/attendance_profile_screen.dart';
 import '../../attendance/presentation/ai_summary_dialog.dart';
 import 'company_detail_screen.dart';
+import 'directory_screen.dart';
+import '../../operations/presentation/operations_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen(
@@ -190,9 +192,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
               label: const Text('AI SUMMARY',
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
             ),
+            if (_isSuperAdministrator) ...[
+              const SizedBox(width: 6),
+              IconButton.outlined(
+                tooltip: 'Operations centre',
+                onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => OperationsScreen(
+                            repository: widget.repository,
+                            session: widget.session))),
+                style: IconButton.styleFrom(
+                    foregroundColor: AppColors.gold,
+                    side: const BorderSide(color: Colors.white38),
+                    minimumSize: const Size(38, 38),
+                    maximumSize: const Size(38, 38),
+                    padding: EdgeInsets.zero),
+                icon: const Icon(Icons.analytics_rounded, size: 18),
+              ),
+            ],
           ]),
         ]),
       );
+
+  bool get _isSuperAdministrator =>
+      widget.session.role
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+          .replaceAll(RegExp(r'^-|-$'), '') ==
+      'ihwe-super-administrator';
 
   Widget _adminInitials() {
     final parts = widget.session.username
@@ -331,6 +359,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           AppColors.green)),
                 ]),
                 const SizedBox(height: 10),
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('REGISTRATION DIRECTORIES',
+                          style: TextStyle(
+                              fontSize: 11,
+                              letterSpacing: 1.4,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.black45)),
+                      Text('Present & total lists',
+                          style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.black.withValues(alpha: .4),
+                              fontWeight: FontWeight.w700)),
+                    ]),
+                const SizedBox(height: 6),
+                Row(children: [
+                  Expanded(
+                      child: _directoryButton('visitor', 'Visitors',
+                          Icons.groups_2_rounded, const Color(0xFF176B87))),
+                  const SizedBox(width: 7),
+                  Expanded(
+                      child: _directoryButton('buyer', 'Buyers',
+                          Icons.handshake_rounded, const Color(0xFF7A4EB2))),
+                  const SizedBox(width: 7),
+                  Expanded(
+                      child: _directoryButton('exhibitor', 'Exhibitors',
+                          Icons.storefront_rounded, AppColors.green)),
+                ]),
+                const SizedBox(height: 10),
                 const Text('DETAILED BREAKDOWN',
                     style: TextStyle(
                         fontSize: 11,
@@ -375,9 +433,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           SizedBox(
                             height: 30,
                             child: OutlinedButton.icon(
-                              onPressed: exportingCompanies
-                                  ? null
-                                  : _exportCompanies,
+                              onPressed:
+                                  exportingCompanies ? null : _exportCompanies,
                               icon: exportingCompanies
                                   ? const SizedBox(
                                       width: 12,
@@ -436,7 +493,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               letterSpacing: 1.4,
                               fontWeight: FontWeight.w900,
                               color: Colors.black45)),
-                      Text('${recent.length} latest',
+                      Text('${recent.length} Latest',
                           style: const TextStyle(
                               fontSize: 11, color: Colors.black38))
                     ]),
@@ -454,11 +511,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ];
   }
 
+  Widget _directoryButton(
+          String type, String label, IconData icon, Color color) =>
+      Material(
+          color: color.withValues(alpha: .09),
+          borderRadius: BorderRadius.circular(13),
+          child: InkWell(
+              borderRadius: BorderRadius.circular(13),
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => DirectoryScreen(
+                          type: type, repository: widget.repository))),
+              child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 5),
+                  child: Column(children: [
+                    Icon(icon, size: 20, color: color),
+                    const SizedBox(height: 4),
+                    Text(label,
+                        maxLines: 1,
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: color)),
+                    const Text('OPEN LIST',
+                        style: TextStyle(
+                            fontSize: 7,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black38))
+                  ]))));
+
   Future<void> _exportCompanies() async {
     setState(() => exportingCompanies = true);
     try {
-      final path = await widget.repository.exportAttendance(
-          day: selectedDay, type: 'exhibitor');
+      final path = await widget.repository
+          .exportAttendance(day: selectedDay, type: 'exhibitor');
       if (!mounted) return;
       await showDialog<void>(
         context: context,
@@ -622,47 +710,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 companyId: companyId, repository: widget.repository)));
       },
       child: Container(
-      width: 190,
-      margin: const EdgeInsets.only(right: 7),
-      child: Card(
-          child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item['company']?.toString() ?? 'Company',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w900)),
-                    const Spacer(),
-                    Row(children: [
-                      Icon(
-                          item['companyAttendance'] == 1
-                              ? Icons.verified_rounded
-                              : Icons.radio_button_unchecked_rounded,
-                          size: 14,
-                          color: item['companyAttendance'] == 1
-                              ? AppColors.emerald
-                              : Colors.black26),
-                      const SizedBox(width: 4),
-                      Text('${item['passPeople'] ?? 0} pass arrivals',
-                          style: const TextStyle(
-                              fontSize: 9, fontWeight: FontWeight.w700)),
-                    ]),
-                    const SizedBox(height: 3),
-                    const Row(children: [
-                      Text('VIEW PROFILE',
-                          style: TextStyle(
-                              color: AppColors.green,
-                              fontSize: 8,
-                              letterSpacing: .7,
-                              fontWeight: FontWeight.w900)),
-                      SizedBox(width: 2),
-                      Icon(Icons.arrow_forward_rounded,
-                          color: AppColors.green, size: 12),
-                    ])
-                  ])))));
+          width: 190,
+          margin: const EdgeInsets.only(right: 7),
+          child: Card(
+              child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item['company']?.toString() ?? 'Company',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w900)),
+                        const Spacer(),
+                        Row(children: [
+                          Icon(
+                              item['companyAttendance'] == 1
+                                  ? Icons.verified_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              size: 14,
+                              color: item['companyAttendance'] == 1
+                                  ? AppColors.emerald
+                                  : Colors.black26),
+                          const SizedBox(width: 4),
+                          Text('${item['passPeople'] ?? 0} pass arrivals',
+                              style: const TextStyle(
+                                  fontSize: 9, fontWeight: FontWeight.w700)),
+                        ]),
+                        const SizedBox(height: 3),
+                        const Row(children: [
+                          Text('VIEW PROFILE',
+                              style: TextStyle(
+                                  color: AppColors.green,
+                                  fontSize: 8,
+                                  letterSpacing: .7,
+                                  fontWeight: FontWeight.w900)),
+                          SizedBox(width: 2),
+                          Icon(Icons.arrow_forward_rounded,
+                              color: AppColors.green, size: 12),
+                        ])
+                      ])))));
   Widget _progress(num present, num total) {
     final ratio = total == 0 ? 0.0 : (present / total).clamp(0, 1).toDouble();
     return Card(
@@ -726,7 +815,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             : item['registrationId']?.toString() ?? '-');
     final displayName =
         isPass && company.isNotEmpty ? '$baseName — $company' : baseName;
-    final photoUrl = item['photoUrl']?.toString() ?? '';
+    final photoUrl = resolveApiAssetUrl(item['photoUrl']);
     return Card(
         margin: const EdgeInsets.only(bottom: 7),
         child: ListTile(
@@ -736,8 +825,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (isCompanyEntry && companyId.length == 24) {
                 Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => CompanyDetailScreen(
-                        companyId: companyId,
-                        repository: widget.repository)));
+                        companyId: companyId, repository: widget.repository)));
               } else if (attendanceId.length == 24) {
                 Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => AttendanceProfileScreen(
@@ -763,7 +851,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 maxLines: 1,
                 style:
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-            subtitle: Text('${item['subjectType']} • ${item['registrationId']}',
+            subtitle: Text(
+                '${sentenceCase(item['subjectType'])} • ${item['registrationId']}',
                 maxLines: 1),
             trailing:
                 Column(mainAxisAlignment: MainAxisAlignment.center, children: [

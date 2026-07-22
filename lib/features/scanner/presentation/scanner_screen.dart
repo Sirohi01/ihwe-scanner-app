@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_skeleton.dart';
 import '../../attendance/data/attendance_repository.dart';
 import 'widgets/person_confirmation_sheet.dart';
+import 'manual_lookup_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key, required this.repository});
@@ -19,6 +21,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
       detectionSpeed: DetectionSpeed.noDuplicates);
   final manual = TextEditingController();
   bool busy = false;
+  bool continuous = false;
 
   Future<void> process(String raw) async {
     if (busy || raw.trim().isEmpty) return;
@@ -36,13 +39,22 @@ class _ScannerScreenState extends State<ScannerScreen> {
             result: result, raw: raw, repository: widget.repository),
       );
       if (marked == true && mounted) {
-        Navigator.pop(context, true);
+        HapticFeedback.mediumImpact();
+        SystemSound.play(SystemSoundType.click);
+        if (continuous) {
+          setState(() => busy = false);
+          await controller.start();
+        } else {
+          Navigator.pop(context, true);
+        }
       } else {
         setState(() => busy = false);
         await controller.start();
       }
     } on ApiException catch (e) {
       if (mounted) {
+        HapticFeedback.vibrate();
+        SystemSound.play(SystemSoundType.alert);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(e.message),
             behavior: SnackBarBehavior.floating,
@@ -69,13 +81,34 @@ class _ScannerScreenState extends State<ScannerScreen> {
             title: const Text('Scan Entry QR',
                 style: TextStyle(fontWeight: FontWeight.w900)),
             actions: [
+              IconButton(
+                  tooltip: 'Manual lookup',
+                  onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => ManualLookupScreen(
+                              repository: widget.repository))),
+                  icon: const Icon(Icons.manage_search_rounded)),
+              IconButton(
+                  tooltip: 'Switch camera',
+                  onPressed: controller.switchCamera,
+                  icon: const Icon(Icons.cameraswitch_rounded)),
               ValueListenableBuilder(
                   valueListenable: controller,
                   builder: (_, state, __) => IconButton(
                       onPressed: controller.toggleTorch,
                       icon: Icon(state.torchState == TorchState.on
                           ? Icons.flash_on_rounded
-                          : Icons.flash_off_rounded)))
+                          : Icons.flash_off_rounded))),
+              IconButton(
+                  tooltip:
+                      continuous ? 'Continuous scan on' : 'Continuous scan off',
+                  onPressed: () => setState(() => continuous = !continuous),
+                  icon: Icon(
+                      continuous
+                          ? Icons.all_inclusive_rounded
+                          : Icons.looks_one_rounded,
+                      color: continuous ? AppColors.gold : Colors.white)),
             ]),
         body: Column(children: [
           Expanded(

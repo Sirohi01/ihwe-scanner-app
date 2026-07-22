@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/config/app_config.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -13,11 +14,13 @@ class PersonConfirmationSheet extends StatefulWidget {
     required this.result,
     required this.raw,
     required this.repository,
+    this.source = 'qr',
   });
 
   final ScanResult result;
   final String raw;
   final AttendanceRepository repository;
+  final String source;
 
   @override
   State<PersonConfirmationSheet> createState() =>
@@ -41,7 +44,8 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
     if (selected.isEmpty) return;
     setState(() => loading = true);
     try {
-      final results = await widget.repository.mark(widget.raw, selected.toList());
+      final results = await widget.repository
+          .mark(widget.raw, selected.toList(), source: widget.source);
       if (!mounted) return;
       final created = results.where((item) => item['created'] == true).length;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -102,13 +106,55 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
                             person.registrationId),
                         _detail(Icons.category_outlined, 'Registration type',
                             attendanceLabel(person.subType)),
-                        _detail(Icons.mail_outline_rounded, 'Email', person.email),
+                        _detail(
+                            Icons.mail_outline_rounded, 'Email', person.email),
                         _detail(Icons.phone_outlined, 'Mobile', person.mobile),
-                        _detail(Icons.public_rounded, 'Country', person.country),
-                        _detail(Icons.verified_outlined, 'Status', person.status),
+                        _detail(
+                            Icons.public_rounded, 'Country', person.country),
+                        _detail(
+                            Icons.verified_outlined, 'Status', person.status),
                       ]),
                     ),
                   ),
+                  if (widget.result.attendance.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(11),
+                      decoration: BoxDecoration(
+                          color: AppColors.gold.withValues(alpha: .18),
+                          border: Border.all(color: AppColors.gold),
+                          borderRadius: BorderRadius.circular(12)),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(children: [
+                              Icon(Icons.info_rounded,
+                                  size: 17, color: AppColors.green),
+                              SizedBox(width: 6),
+                              Text('ALREADY MARKED',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.green))
+                            ]),
+                            const SizedBox(height: 5),
+                            ...widget.result.attendance.map((record) {
+                              final at = DateTime.tryParse(
+                                  record['markedAt']?.toString() ?? '');
+                              final when = at == null
+                                  ? record['eventDay'].toString()
+                                  : DateFormat('d MMM, h:mm a')
+                                      .format(at.toLocal());
+                              return Text(
+                                  '$when • ${record['markedByName']?.toString().isNotEmpty == true ? record['markedByName'] : 'Unknown admin'}${record['gate']?.toString().isNotEmpty == true ? ' • ${record['gate']}' : ''}',
+                                  style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700));
+                            }),
+                          ]),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -145,8 +191,8 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-              colors: [AppColors.navy, _typeColor(person.type)]),
+          gradient:
+              LinearGradient(colors: [AppColors.navy, _typeColor(person.type)]),
           borderRadius: BorderRadius.circular(22),
           boxShadow: const [
             BoxShadow(
@@ -205,8 +251,8 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
                     child: Text(person.designation,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(color: Colors.white60, fontSize: 9)),
+                        style: const TextStyle(
+                            color: Colors.white60, fontSize: 9)),
                   ),
               ],
             ),
@@ -233,9 +279,8 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
         value: done || checked,
         onChanged: done
             ? null
-            : (value) => setState(() => value == true
-                ? selected.add(day)
-                : selected.remove(day)),
+            : (value) => setState(
+                () => value == true ? selected.add(day) : selected.remove(day)),
         activeColor: done ? Colors.grey : AppColors.green,
         secondary: Container(
           width: 36,
@@ -259,8 +304,7 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
                   ? 'Selected for entry'
                   : 'Tap to select',
           style: TextStyle(
-              fontSize: 9,
-              color: done ? AppColors.emerald : Colors.black45),
+              fontSize: 9, color: done ? AppColors.emerald : Colors.black45),
         ),
       ),
     );
@@ -307,7 +351,7 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
         child: person.photoUrl.isNotEmpty
             ? Padding(
                 padding: EdgeInsets.all(person.photoKind == 'logo' ? 7 : 0),
-                child: Image.network(person.photoUrl,
+                child: Image.network(resolveApiAssetUrl(person.photoUrl),
                     fit: person.photoKind == 'logo'
                         ? BoxFit.contain
                         : BoxFit.cover,
@@ -326,9 +370,7 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
         child: Text(
           (person.name.isNotEmpty ? person.name[0] : '?').toUpperCase(),
           style: const TextStyle(
-              color: AppColors.gold,
-              fontWeight: FontWeight.w900,
-              fontSize: 36),
+              color: AppColors.gold, fontWeight: FontWeight.w900, fontSize: 36),
         ),
       );
 

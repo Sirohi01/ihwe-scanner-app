@@ -35,8 +35,10 @@ class ScanResult {
         days = List<String>.from(json['days'] ?? []),
         attendedDays = (json['attendance'] as List? ?? [])
             .map((e) => e['eventDay'].toString())
-            .toSet();
+            .toSet(),
+        attendance = List<Map<String, dynamic>>.from(json['attendance'] ?? []);
   final PersonProfile person;
   final List<String> days;
   final Set<String> attendedDays;
+  final List<Map<String, dynamic>> attendance;
 }

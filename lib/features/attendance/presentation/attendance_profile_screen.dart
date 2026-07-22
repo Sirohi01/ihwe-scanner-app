@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../core/config/app_config.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_skeleton.dart';
@@ -66,7 +67,8 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
                     : Column(mainAxisSize: MainAxisSize.min, children: [
                         Text('$error', textAlign: TextAlign.center),
                         const SizedBox(height: 10),
-                        FilledButton(onPressed: load, child: const Text('Retry')),
+                        FilledButton(
+                            onPressed: load, child: const Text('Retry')),
                       ]))
             : RefreshIndicator(onRefresh: load, child: _content()),
       );
@@ -75,7 +77,7 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
     final profile = Map<String, dynamic>.from(data!['profile']);
     final attendance =
         List<Map<String, dynamic>>.from(data!['attendance'] ?? []);
-    final photo = profile['photoUrl']?.toString() ?? '';
+    final photo = resolveApiAssetUrl(profile['photoUrl']);
     final isLogo = profile['photoKind']?.toString() == 'logo';
     final name = profile['name']?.toString().isNotEmpty == true
         ? profile['name'].toString()
@@ -83,23 +85,23 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
     final type = attendanceLabel(
         profile['subjectSubType'] ?? profile['subjectType'] ?? '');
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
+      padding: const EdgeInsets.fromLTRB(14, 9, 14, 90),
       children: [
         Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [AppColors.navy, AppColors.green]),
+            gradient:
+                const LinearGradient(colors: [AppColors.navy, AppColors.green]),
             borderRadius: BorderRadius.circular(22),
           ),
           child: Column(children: [
             Container(
-              width: 90,
-              height: 104,
+              width: 74,
+              height: 80,
               decoration: BoxDecoration(
                 color: isLogo ? Colors.white : Colors.white12,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.gold, width: 2),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: AppColors.gold, width: 1.5),
               ),
               clipBehavior: Clip.antiAlias,
               child: photo.isNotEmpty
@@ -110,12 +112,12 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
                           errorBuilder: (_, __, ___) => _initial(name)))
                   : _initial(name),
             ),
-            const SizedBox(height: 11),
+            const SizedBox(height: 8),
             Text(name,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w900)),
             if (profile['company']?.toString().isNotEmpty == true)
               Padding(
@@ -127,7 +129,7 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
                         fontSize: 12,
                         fontWeight: FontWeight.w800)),
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -154,13 +156,13 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
               _detail(Icons.email_outlined, 'Email', profile['email']),
               _detail(Icons.phone_outlined, 'Mobile', profile['mobile']),
               _detail(Icons.public_rounded, 'Country', profile['country']),
-              _detail(Icons.verified_outlined, 'Status', profile['status']),
+              _detail(Icons.verified_outlined, 'Status',
+                  sentenceCase(profile['status'])),
               _detail(Icons.confirmation_number_outlined, 'Pass type',
-                  profile['passType']),
+                  sentenceCase(profile['passType'])),
             ]),
           ),
         ),
-        ..._detailSections(profile['details']),
         const SizedBox(height: 13),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('ATTENDANCE DAYS',
@@ -169,7 +171,7 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
                   letterSpacing: 1.2,
                   fontWeight: FontWeight.w900,
                   color: Colors.black45)),
-          Text('${attendance.length} marked',
+          Text('${attendance.length} Marked',
               style: const TextStyle(
                   color: AppColors.green,
                   fontSize: 10,
@@ -177,6 +179,7 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
         ]),
         const SizedBox(height: 6),
         ...attendance.map(_attendanceDay),
+        ..._detailSections(profile['details']),
       ],
     );
   }
@@ -193,12 +196,13 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
     final value = raw?.toString() ?? '';
     if (value.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(children: [
         Icon(icon, color: AppColors.green, size: 18),
         const SizedBox(width: 10),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label.toUpperCase(),
                 style: const TextStyle(
                     color: Colors.black38,
@@ -221,20 +225,109 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
         dense: true,
-        leading: const Icon(Icons.check_circle_rounded,
-            color: AppColors.emerald),
+        leading:
+            const Icon(Icons.check_circle_rounded, color: AppColors.emerald),
         title: Text(day == null ? '-' : DateFormat('EEEE, d MMMM').format(day),
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
         subtitle: marked == null
             ? null
             : Text(DateFormat('h:mm a').format(marked.toLocal()),
                 style: const TextStyle(fontSize: 9)),
-        trailing: item['gate']?.toString().isNotEmpty == true
-            ? Text(item['gate'].toString(),
-                style: const TextStyle(fontSize: 9, color: Colors.black45))
-            : null,
+        trailing: PopupMenuButton<String>(
+          tooltip: 'Correct attendance',
+          onSelected: (value) => value == 'remove'
+              ? _removeAttendance(item)
+              : _correctAttendance(item),
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 'correct', child: Text('Correct day / gate')),
+            PopupMenuItem(value: 'remove', child: Text('Remove attendance')),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _correctAttendance(Map<String, dynamic> item) async {
+    final reason = TextEditingController();
+    final gate = TextEditingController(text: item['gate']?.toString() ?? '');
+    final days = List<String>.from(data?['days'] ?? []);
+    String selectedDay = item['eventDay']?.toString() ?? '';
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+                  title: const Text('Correct attendance'),
+                  content: Column(mainAxisSize: MainAxisSize.min, children: [
+                    DropdownButtonFormField<String>(
+                        value: days.contains(selectedDay) ? selectedDay : null,
+                        decoration: const InputDecoration(
+                            labelText: 'Correct event day'),
+                        items: days
+                            .map((day) => DropdownMenuItem(
+                                value: day,
+                                child: Text(DateFormat('d MMM yyyy')
+                                    .format(DateTime.parse(day)))))
+                            .toList(),
+                        onChanged: (value) => setDialogState(
+                            () => selectedDay = value ?? selectedDay)),
+                    const SizedBox(height: 9),
+                    TextField(
+                        controller: gate,
+                        decoration: const InputDecoration(labelText: 'Gate')),
+                    const SizedBox(height: 9),
+                    TextField(
+                        controller: reason,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                            labelText: 'Correction reason *')),
+                  ]),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(
+                            context, reason.text.trim().isNotEmpty),
+                        child: const Text('Save correction'))
+                  ],
+                )));
+    if (confirmed == true) {
+      await widget.repository.correctAttendance(item['_id'].toString(),
+          reason: reason.text.trim(), day: selectedDay, gate: gate.text);
+      await load();
+    }
+    reason.dispose();
+    gate.dispose();
+  }
+
+  Future<void> _removeAttendance(Map<String, dynamic> item) async {
+    final reason = TextEditingController();
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('Remove attendance?'),
+                content: TextField(
+                    controller: reason,
+                    maxLines: 2,
+                    decoration:
+                        const InputDecoration(labelText: 'Removal reason *')),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      style:
+                          FilledButton.styleFrom(backgroundColor: Colors.red),
+                      onPressed: () =>
+                          Navigator.pop(context, reason.text.trim().isNotEmpty),
+                      child: const Text('Remove'))
+                ]));
+    if (confirmed == true) {
+      await widget.repository
+          .removeAttendance(item['_id'].toString(), reason.text.trim());
+      await load();
+    }
+    reason.dispose();
   }
 
   List<Widget> _detailSections(dynamic raw) {
@@ -242,30 +335,67 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
     final details = Map<String, dynamic>.from(raw);
     final groups = <String, List<String>>{
       'Personal details': [
-        'title', 'gender', 'dateOfBirth', 'alternateNo', 'alternateNumber',
-        'alternateMobile', 'whatsappNumber'
+        'title',
+        'gender',
+        'dateOfBirth',
+        'alternateNo',
+        'alternateNumber',
+        'alternateMobile',
+        'whatsappNumber'
       ],
       'Location': [
-        'address', 'registeredAddress', 'residenceAddress', 'state', 'city',
-        'pinCode', 'pincode', 'postalCode'
+        'address',
+        'registeredAddress',
+        'residenceAddress',
+        'state',
+        'city',
+        'pinCode',
+        'pincode',
+        'postalCode'
       ],
       'Business profile': [
-        'registrationFor', 'companyWebsite', 'website', 'industrySector',
-        'companySize', 'businessType', 'typeOfBusiness', 'natureOfBusiness',
-        'buyerIndustry', 'annualTurnover', 'yearOfEstablishment',
-        'legalEntityType', 'countryOfRegistration', 'groupSize'
+        'registrationFor',
+        'companyWebsite',
+        'website',
+        'industrySector',
+        'companySize',
+        'businessType',
+        'typeOfBusiness',
+        'natureOfBusiness',
+        'buyerIndustry',
+        'annualTurnover',
+        'yearOfEstablishment',
+        'legalEntityType',
+        'countryOfRegistration',
+        'groupSize'
       ],
       'Interests & preferences': [
-        'purposeOfVisit', 'areaOfInterest', 'specificRequirement',
-        'primaryProductInterest', 'primaryProductCategory',
-        'secondaryProductCategories', 'productCategories', 'targetMarket',
-        'purchaseTimeline', 'roleInPurchaseDecision', 'b2bMeeting',
-        'b2bMeetInterest', 'b2bInterest', 'preferredDate',
-        'preferredTimeSlot', 'specificHealthConcerns'
+        'purposeOfVisit',
+        'areaOfInterest',
+        'specificRequirement',
+        'primaryProductInterest',
+        'primaryProductCategory',
+        'secondaryProductCategories',
+        'productCategories',
+        'targetMarket',
+        'purchaseTimeline',
+        'roleInPurchaseDecision',
+        'b2bMeeting',
+        'b2bMeetInterest',
+        'b2bInterest',
+        'preferredDate',
+        'preferredTimeSlot',
+        'specificHealthConcerns'
       ],
       'Registration & pass': [
-        'registrationCategory', 'registrationSource', 'buyerTag', 'sellerTag',
-        'vehicleType', 'vehicleNumber', 'sessions', 'specialPasses'
+        'registrationCategory',
+        'registrationSource',
+        'buyerTag',
+        'sellerTag',
+        'vehicleType',
+        'vehicleNumber',
+        'sessions',
+        'specialPasses'
       ],
     };
     final used = <String>{};
@@ -276,14 +406,15 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
           .toList();
       if (values.isEmpty) continue;
       used.addAll(values);
-      widgets.add(const SizedBox(height: 10));
+      widgets.add(const SizedBox(height: 6));
       widgets.add(_detailsCard(group.key, values, details));
     }
     final remaining = details.keys
-        .where((key) => !used.contains(key) && _displayValue(details[key]).isNotEmpty)
+        .where((key) =>
+            !used.contains(key) && _displayValue(details[key]).isNotEmpty)
         .toList();
     if (remaining.isNotEmpty) {
-      widgets.add(const SizedBox(height: 10));
+      widgets.add(const SizedBox(height: 6));
       widgets.add(_detailsCard('Additional details', remaining, details));
     }
     return widgets;
@@ -292,34 +423,30 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
   Widget _detailsCard(
       String title, List<String> keys, Map<String, dynamic> details) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 13, 14, 7),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              width: 4,
-              height: 18,
-              decoration: BoxDecoration(
-                  color: AppColors.green,
-                  borderRadius: BorderRadius.circular(4)),
-            ),
-            const SizedBox(width: 8),
-            Text(title.toUpperCase(),
-                style: const TextStyle(
-                    fontSize: 10,
-                    letterSpacing: 1,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.navy)),
-          ]),
-          const SizedBox(height: 5),
-          ...keys.map((key) => _detail(
-              _detailIcon(key), _fieldLabel(key), _displayValue(details[key]))),
-        ]),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 7),
+        visualDensity: const VisualDensity(vertical: -3),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        leading: const Icon(Icons.info_outline_rounded,
+            color: AppColors.green, size: 17),
+        title: Text(title,
+            style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: AppColors.navy)),
+        subtitle: Text('${keys.length} Details',
+            style: const TextStyle(fontSize: 8, color: Colors.black38)),
+        children: keys
+            .map((key) => _detail(_detailIcon(key), _fieldLabel(key),
+                _displayValue(details[key], key: key)))
+            .toList(),
       ),
     );
   }
 
-  String _displayValue(dynamic value) {
+  String _displayValue(dynamic value, {String key = ''}) {
     if (value == null) return '';
     if (value is List) {
       return value
@@ -335,7 +462,21 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
     }
     final text = value.toString().trim();
     if (text == 'null' || text == '[]' || text == '{}') return '';
-    return text;
+    const caseFields = {
+      'gender',
+      'status',
+      'passType',
+      'registrationFor',
+      'businessType',
+      'natureOfBusiness',
+      'registrationCategory',
+      'buyerTag',
+      'sellerTag',
+      'roleInPurchaseDecision',
+      'typeOfBusiness',
+      'legalEntityType'
+    };
+    return caseFields.contains(key) ? sentenceCase(text) : text;
   }
 
   String _fieldLabel(String key) {
@@ -348,8 +489,10 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
 
   IconData _detailIcon(String key) {
     final value = key.toLowerCase();
-    if (value.contains('address') || value.contains('city') ||
-        value.contains('state') || value.contains('pin')) {
+    if (value.contains('address') ||
+        value.contains('city') ||
+        value.contains('state') ||
+        value.contains('pin')) {
       return Icons.location_on_outlined;
     }
     if (value.contains('website')) return Icons.language_rounded;

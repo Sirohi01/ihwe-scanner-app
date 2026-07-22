@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../core/config/app_config.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_skeleton.dart';
@@ -161,10 +162,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 scrollDirection: Axis.horizontal,
                 children: [
                   _dayChip('', 'All days'),
-                  ...days.map((value) => _dayChip(
-                      value,
-                      DateFormat('EEE, d MMM')
-                          .format(DateTime.parse(value)))),
+                  ...days.map((value) => _dayChip(value,
+                      DateFormat('EEE, d MMM').format(DateTime.parse(value)))),
                 ],
               ),
             ),
@@ -268,8 +267,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Export failed: $error')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $error')));
       }
     } finally {
       if (mounted) setState(() => exporting = false);
@@ -287,8 +286,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ? ListView(
               controller: scroll,
               padding: const EdgeInsets.fromLTRB(18, 2, 18, 90),
-              keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: records.map(_recordCard).toList(),
             )
           : ListView.builder(
@@ -296,8 +294,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               padding: const EdgeInsets.fromLTRB(18, 2, 18, 90),
               itemExtent: 76,
               cacheExtent: 380,
-              keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               itemCount: records.length + (loadingMore ? 1 : 0),
               itemBuilder: (_, i) => i == records.length
                   ? const Center(
@@ -350,7 +347,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final detail = isCompanyEntry
         ? '${attendanceLabel(record['subjectSubType'] ?? '')} • ${record['registrationId'] ?? ''}'
         : '${company.isNotEmpty ? company : attendanceLabel(record['subjectSubType'] ?? '')} • ${attendanceLabel(record['subjectSubType'] ?? '')}';
-    final photoUrl = record['photoUrl']?.toString() ?? '';
+    final photoUrl = resolveApiAssetUrl(record['photoUrl']);
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
@@ -386,7 +383,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Row(mainAxisSize: MainAxisSize.min, children: [
-              Text(eventDay == null ? '-' : DateFormat('d MMM').format(eventDay),
+              Text(
+                  eventDay == null ? '-' : DateFormat('d MMM').format(eventDay),
                   style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w900,

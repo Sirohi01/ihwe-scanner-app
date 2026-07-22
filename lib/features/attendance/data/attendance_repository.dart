@@ -8,14 +8,52 @@ class AttendanceRepository {
   AttendanceRepository(SessionStore session) : api = ApiClient(session);
   final ApiClient api;
   static const _files = MethodChannel('ihwe_attendance/files');
-  Future<ScanResult> resolve(String raw) async {
-    final result = await api.post('/attendance/resolve', {'raw': raw});
+  Future<ScanResult> resolve(String raw, {String source = 'qr'}) async {
+    final result =
+        await api.post('/attendance/resolve', {'raw': raw, 'source': source});
     return ScanResult.fromJson(Map<String, dynamic>.from(result['data']));
   }
 
-  Future<List<Map<String, dynamic>>> mark(String raw, List<String> days) async {
+  Future<List<Map<String, dynamic>>> manualSearch(String search) async =>
+      List<Map<String, dynamic>>.from((await api.get(
+          '/attendance/manual-search',
+          query: {'search': search}))['data']);
+
+  Future<Map<String, dynamic>> insights() async => Map<String, dynamic>.from(
+      (await api.get('/attendance/insights'))['data']);
+
+  Future<Map<String, dynamic>> notifications({int target = 500}) async =>
+      Map<String, dynamic>.from((await api.get('/attendance/notifications',
+          query: {'target': '$target'}))['data']);
+
+  Future<Map<String, dynamic>> superAdminOperations() async =>
+      Map<String, dynamic>.from(
+          (await api.get('/attendance/super-admin/operations'))['data']);
+
+  Future<Map<String, dynamic>> employeeOperations(String userId,
+          {String? day, String? source, String? action}) async =>
+      Map<String, dynamic>.from(
+          (await api.get('/attendance/super-admin/operations/$userId', query: {
+        if (day?.isNotEmpty == true) 'day': day!,
+        if (source?.isNotEmpty == true) 'source': source!,
+        if (action?.isNotEmpty == true) 'action': action!,
+      }))['data']);
+
+  Future<Map<String, dynamic>> correctAttendance(String id,
+          {required String reason, String? day, String? gate}) async =>
+      Map<String, dynamic>.from((await api.patch('/attendance/records/$id', {
+        'reason': reason,
+        if (day?.isNotEmpty == true) 'eventDay': day,
+        if (gate != null) 'gate': gate,
+      }))['data']);
+
+  Future<void> removeAttendance(String id, String reason) async =>
+      api.delete('/attendance/$id', body: {'reason': reason});
+
+  Future<List<Map<String, dynamic>>> mark(String raw, List<String> days,
+      {String source = 'qr'}) async {
     final result = await api
-        .post('/attendance/mark', {'raw': raw, 'days': days, 'source': 'qr'});
+        .post('/attendance/mark', {'raw': raw, 'days': days, 'source': source});
     return List<Map<String, dynamic>>.from(result['data']['results']);
   }
 
@@ -51,6 +89,29 @@ class AttendanceRepository {
       Map<String, dynamic>.from(
           (await api.get('/attendance/profile/$attendanceId'))['data']);
 
+  Future<Map<String, dynamic>> directory(String type,
+          {String view = 'present',
+          String? day,
+          String? subType,
+          String? search,
+          int page = 1}) async =>
+      Map<String, dynamic>.from(
+          (await api.get('/attendance/directory/$type', query: {
+        'view': view,
+        if (day?.isNotEmpty == true) 'day': day!,
+        if (subType?.isNotEmpty == true) 'subType': subType!,
+        if (search?.isNotEmpty == true) 'search': search!,
+        'page': '$page',
+        'limit': '500',
+      }))['data']);
+
+  Future<
+      Map<String,
+          dynamic>> directoryProfile(String registrationId) async => Map<String,
+      dynamic>.from((await api.get(
+          '/attendance/directory-profile/${Uri.encodeComponent(registrationId)}'))[
+      'data']);
+
   Future<String> exportAttendance(
       {String? day,
       String? type,
@@ -79,6 +140,22 @@ class AttendanceRepository {
       throw ApiException('Android could not save the Excel file.');
     }
     return savedPath!;
+  }
+
+  Future<String> exportPdf({String? day, String? type, String? subType}) async {
+    final response = await api.download('/attendance/export/pdf', query: {
+      if (day?.isNotEmpty == true) 'day': day!,
+      if (type?.isNotEmpty == true) 'type': type!,
+      if (subType?.isNotEmpty == true) 'subType': subType!,
+    });
+    final disposition = response.headers['content-disposition'] ?? '';
+    final filename =
+        RegExp(r'filename="?([^";]+)').firstMatch(disposition)?.group(1) ??
+            'IHWE-summary.pdf';
+    final saved = await _files.invokeMethod<String>(
+        'saveToDownloads', {'filename': filename, 'bytes': response.bodyBytes});
+    if (saved?.isNotEmpty != true) throw ApiException('Could not save PDF.');
+    return saved!;
   }
 
   Future<String> aiSummary(String scope, {String? id}) async {

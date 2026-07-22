@@ -29,6 +29,20 @@ class ApiClient {
         await http.post(uri, headers: _headers, body: jsonEncode(body)));
   }
 
+  Future<Map<String, dynamic>> patch(
+      String path, Map<String, dynamic> body) async {
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    return _decode(
+        await http.patch(uri, headers: _headers, body: jsonEncode(body)));
+  }
+
+  Future<Map<String, dynamic>> delete(String path,
+      {Map<String, dynamic>? body}) async {
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    return _decode(await http.delete(uri,
+        headers: _headers, body: body == null ? null : jsonEncode(body)));
+  }
+
   Future<http.Response> download(String path,
       {Map<String, String>? query}) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$path')
