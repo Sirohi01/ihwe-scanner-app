@@ -38,6 +38,8 @@ class _CommunicationCallScreenState extends State<CommunicationCallScreen> {
   bool cameraEnabled = true;
   bool speakerEnabled = true;
   bool ended = false;
+  bool mediaDisposed = false;
+  Timer? disconnectTimer;
   String status = 'Preparing secure call...';
 
   String get callId => widget.call['_id'].toString();
@@ -100,15 +102,34 @@ class _CommunicationCallScreenState extends State<CommunicationCallScreen> {
         });
       };
       peer!.onConnectionState = (state) {
-        if (!mounted) return;
+        if (!mounted || ended) return;
+        if (state ==
+            RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+          disconnectTimer?.cancel();
+          disconnectTimer = null;
+          setState(() => status = 'Connected securely');
+          return;
+        }
+        if (state ==
+            RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+          setState(() => status = 'Reconnecting...');
+          disconnectTimer ??= Timer(const Duration(seconds: 12), () {
+            if (mounted && !ended) {
+              unawaited(_end(reason: 'connection-lost'));
+            }
+          });
+          return;
+        }
+        if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
+          setState(() => status = 'Connection failed');
+          unawaited(_end(reason: 'connection-failed'));
+          return;
+        }
         setState(() {
-          status =
-              state == RTCPeerConnectionState.RTCPeerConnectionStateConnected
-                  ? 'Connected securely'
-                  : state
-                      .toString()
-                      .replaceAll('RTCPeerConnectionState.', '')
-                      .replaceAll('RTCPeerConnectionState', '');
+          status = state
+              .toString()
+              .replaceAll('RTCPeerConnectionState.', '')
+              .replaceAll('RTCPeerConnectionState', '');
         });
       };
       if (widget.isCaller) {
@@ -213,24 +234,44 @@ class _CommunicationCallScreenState extends State<CommunicationCallScreen> {
     if (mounted) Navigator.pop(context);
   }
 
-  Future<void> _disposeMedia() async {
-    await callSubscription?.cancel();
-    for (final track in localStream?.getTracks() ?? <MediaStreamTrack>[]) {
-      track.stop();
+  Future<void> _endCallSilently(String reason) async {
+    try {
+      await widget.repository
+          .updateCommunicationCall(callId, 'end', reason: reason);
+    } catch (_) {
+      // The remote participant or timeout worker may have ended it first.
     }
-    await localStream?.dispose();
-    await peer?.close();
+  }
+
+  Future<void> _disposeMedia() async {
+    if (mediaDisposed) return;
+    mediaDisposed = true;
+    disconnectTimer?.cancel();
+    disconnectTimer = null;
     localRenderer.srcObject = null;
     remoteRenderer.srcObject = null;
+    final subscription = callSubscription;
+    callSubscription = null;
+    final stream = localStream;
+    localStream = null;
+    final connection = peer;
+    peer = null;
+    for (final track in stream?.getTracks() ?? <MediaStreamTrack>[]) {
+      track.stop();
+    }
+    await subscription?.cancel();
+    await stream?.dispose();
+    await connection?.close();
   }
 
   @override
   void dispose() {
     if (!ended) {
       ended = true;
-      widget.repository
-          .updateCommunicationCall(callId, 'end', reason: 'screen-closed');
-      _disposeMedia();
+      unawaited(_endCallSilently('screen-closed'));
+      unawaited(_disposeMedia());
+    } else if (!mediaDisposed) {
+      unawaited(_disposeMedia());
     }
     localRenderer.dispose();
     remoteRenderer.dispose();
