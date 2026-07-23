@@ -38,6 +38,7 @@ class _CommunicationThreadScreenState extends State<CommunicationThreadScreen> {
   final List<Map<String, dynamic>> pendingAttachments = [];
   Timer? refreshTimer;
   StreamSubscription<Map<String, dynamic>>? messageSubscription;
+  StreamSubscription<Map<String, dynamic>>? deliverySubscription;
   StreamSubscription<Map<String, dynamic>>? readSubscription;
   StreamSubscription<Map<String, dynamic>>? presenceSubscription;
   bool loading = true;
@@ -101,6 +102,21 @@ class _CommunicationThreadScreenState extends State<CommunicationThreadScreen> {
         });
       }
     });
+    deliverySubscription = realtime.deliveries.listen((event) {
+      if (event['conversationId']?.toString() != widget.conversationId) return;
+      final deliveredIds = List<dynamic>.from(event['messageIds'] ?? const [])
+          .map((id) => id.toString())
+          .toSet();
+      if (!mounted || deliveredIds.isEmpty) return;
+      setState(() {
+        for (final message in messages) {
+          if (message['isMine'] == true &&
+              deliveredIds.contains(message['_id']?.toString())) {
+            message['deliveredAt'] = event['deliveredAt'];
+          }
+        }
+      });
+    });
     presenceSubscription = realtime.presence.listen((event) {
       if (event['userId']?.toString() == widget.person['_id']?.toString() &&
           mounted) {
@@ -113,6 +129,7 @@ class _CommunicationThreadScreenState extends State<CommunicationThreadScreen> {
   void dispose() {
     refreshTimer?.cancel();
     messageSubscription?.cancel();
+    deliverySubscription?.cancel();
     readSubscription?.cancel();
     presenceSubscription?.cancel();
     input.dispose();
@@ -277,6 +294,8 @@ class _CommunicationThreadScreenState extends State<CommunicationThreadScreen> {
     final created =
         DateTime.tryParse(message['createdAt']?.toString() ?? '')?.toLocal();
     final read = DateTime.tryParse(message['readAt']?.toString() ?? '') != null;
+    final delivered =
+        DateTime.tryParse(message['deliveredAt']?.toString() ?? '') != null;
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
@@ -349,8 +368,19 @@ class _CommunicationThreadScreenState extends State<CommunicationThreadScreen> {
                       fontSize: 7)),
               if (mine) ...[
                 const SizedBox(width: 3),
-                Icon(read ? Icons.done_all_rounded : Icons.done_rounded,
-                    size: 12, color: read ? AppColors.gold : Colors.white60),
+                Tooltip(
+                  message: read
+                      ? 'Read'
+                      : delivered
+                          ? 'Delivered'
+                          : 'Sent',
+                  child: Icon(
+                      read || delivered
+                          ? Icons.done_all_rounded
+                          : Icons.done_rounded,
+                      size: 12,
+                      color: read ? AppColors.gold : Colors.white60),
+                ),
               ]
             ])
           ]),

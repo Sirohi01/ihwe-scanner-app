@@ -11,6 +11,7 @@ class CommunicationRealtimeService {
   static final instance = CommunicationRealtimeService._();
 
   final _messages = StreamController<Map<String, dynamic>>.broadcast();
+  final _deliveries = StreamController<Map<String, dynamic>>.broadcast();
   final _reads = StreamController<Map<String, dynamic>>.broadcast();
   final _presence = StreamController<Map<String, dynamic>>.broadcast();
   final _calls = StreamController<Map<String, dynamic>>.broadcast();
@@ -20,6 +21,7 @@ class CommunicationRealtimeService {
   bool _notificationsReady = false;
 
   Stream<Map<String, dynamic>> get messages => _messages.stream;
+  Stream<Map<String, dynamic>> get deliveries => _deliveries.stream;
   Stream<Map<String, dynamic>> get reads => _reads.stream;
   Stream<Map<String, dynamic>> get presence => _presence.stream;
   Stream<Map<String, dynamic>> get calls => _calls.stream;
@@ -48,11 +50,18 @@ class CommunicationRealtimeService {
     socket.on('message:new', (raw) {
       final value = _map(raw);
       _messages.add(value);
-      if (value['isMine'] != true) _showMessageNotification(value);
+      if (value['isMine'] != true) {
+        final messageId = value['_id']?.toString();
+        if (messageId?.isNotEmpty == true) {
+          socket.emit('message:delivered', {'messageId': messageId});
+        }
+        _showMessageNotification(value);
+      }
     });
     socket.on('message:updated',
         (raw) => _messages.add({..._map(raw), 'realtimeUpdated': true}));
     socket.on('messages:read', (raw) => _reads.add(_map(raw)));
+    socket.on('message:delivered', (raw) => _deliveries.add(_map(raw)));
     socket.on('presence:changed', (raw) => _presence.add(_map(raw)));
     socket.on('call:incoming', (raw) {
       final value = _map(raw);

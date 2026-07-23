@@ -103,8 +103,7 @@ class _CommunicationCallScreenState extends State<CommunicationCallScreen> {
       };
       peer!.onConnectionState = (state) {
         if (!mounted || ended) return;
-        if (state ==
-            RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
           disconnectTimer?.cancel();
           disconnectTimer = null;
           setState(() => status = 'Connected securely');
