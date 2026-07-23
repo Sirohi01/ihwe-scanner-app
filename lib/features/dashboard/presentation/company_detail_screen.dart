@@ -27,6 +27,7 @@ class CompanyDetailScreen extends StatefulWidget {
 
 class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   Map<String, dynamic>? data;
+  Map<String, dynamic>? timelineData;
   Object? error;
   String selectedPassType = '';
   bool exporting = false;
@@ -49,10 +50,20 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
 
   Future<void> load() async {
     try {
-      final value = await widget.repository.companyDetail(widget.companyId);
-      if (mounted) setState(() => data = value);
+      final values = await Future.wait([
+        widget.repository.companyDetail(widget.companyId),
+        widget.repository.companyTimeline(widget.companyId),
+      ]);
+      if (mounted) {
+        setState(() {
+          data = values[0];
+          timelineData = values[1];
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() => error = e);
+      if (mounted) {
+        setState(() => error = e);
+      }
     }
   }
 
@@ -241,6 +252,10 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
         sliver: SliverToBoxAdapter(child: _companyInformation(company)),
       ),
       SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 3, 16, 10),
+        sliver: SliverToBoxAdapter(child: _arrivalTimeline()),
+      ),
+      SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 3, 16, 5),
         sliver: SliverToBoxAdapter(
           child:
@@ -369,6 +384,78 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
               Icons.text_fields_rounded, 'Fascia name', stall['fasciaName']),
         ]),
       ),
+    );
+  }
+
+  Widget _arrivalTimeline() {
+    final events = List<Map<String, dynamic>>.from(
+        timelineData?['timeline'] ?? <Map<String, dynamic>>[]);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE1E8E4))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.timeline_rounded, size: 18, color: AppColors.green),
+          const SizedBox(width: 7),
+          const Expanded(
+              child: Text('COMPANY ARRIVAL TIMELINE',
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: .8))),
+          Text('${events.length} Events',
+              style: const TextStyle(
+                  fontSize: 9,
+                  color: AppColors.green,
+                  fontWeight: FontWeight.w800)),
+        ]),
+        const SizedBox(height: 9),
+        if (events.isEmpty)
+          const Text('No company or team arrival recorded yet.',
+              style: TextStyle(fontSize: 9.5, color: Colors.black45))
+        else
+          ...events.reversed.take(8).map((event) {
+            final at = DateTime.tryParse(event['at']?.toString() ?? '');
+            final companyEvent = event['kind'] == 'company';
+            return IntrinsicHeight(
+              child:
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Column(children: [
+                  Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                          color:
+                              companyEvent ? AppColors.gold : AppColors.green,
+                          shape: BoxShape.circle)),
+                  Container(
+                      width: 1, height: 34, color: const Color(0xFFDCE5DF)),
+                ]),
+                const SizedBox(width: 9),
+                Expanded(
+                    child: Padding(
+                  padding: const EdgeInsets.only(bottom: 9),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(event['title']?.toString() ?? 'Arrival',
+                            style: const TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.w900)),
+                        Text(event['subtitle']?.toString() ?? '',
+                            style: const TextStyle(fontSize: 8.5)),
+                        Text(
+                            '${at == null ? event['eventDay'] ?? '' : DateFormat('d MMM, h:mm a').format(at.toLocal())} • ${event['markedByName'] ?? 'Admin'}',
+                            style: const TextStyle(
+                                fontSize: 8, color: Colors.black45)),
+                      ]),
+                )),
+              ]),
+            );
+          }),
+      ]),
     );
   }
 

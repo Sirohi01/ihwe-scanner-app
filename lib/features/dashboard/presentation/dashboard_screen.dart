@@ -8,6 +8,7 @@ import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/attendance_profile_screen.dart';
 import '../../attendance/presentation/ai_summary_dialog.dart';
+import '../../operations/presentation/device_health_screen.dart';
 import 'company_detail_screen.dart';
 import 'directory_screen.dart';
 import '../../operations/presentation/operations_screen.dart';
@@ -37,6 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     load();
+    widget.repository.syncDeviceHealth();
   }
 
   Future<void> load() async {
@@ -178,19 +180,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 icon: const Icon(Icons.qr_code_scanner_rounded, size: 17),
                 label: const Text('SCAN ENTRY QR')),
             const SizedBox(width: 8),
-            OutlinedButton.icon(
+            IconButton.outlined(
+              tooltip: 'AI summary',
               onPressed: () => showAiSummaryDialog(context,
                   repository: widget.repository, scope: 'exhibition'),
-              style: OutlinedButton.styleFrom(
+              style: IconButton.styleFrom(
                 foregroundColor: Colors.white,
                 side: const BorderSide(color: Colors.white38),
-                minimumSize: const Size(0, 38),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(38, 38),
+                maximumSize: const Size(38, 38),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: EdgeInsets.zero,
               ),
               icon: const Icon(Icons.auto_awesome_rounded,
                   color: AppColors.gold, size: 16),
-              label: const Text('AI SUMMARY',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
+            ),
+            const SizedBox(width: 6),
+            IconButton.outlined(
+              tooltip: 'Device health',
+              onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          DeviceHealthScreen(repository: widget.repository))),
+              style: IconButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white38),
+                  minimumSize: const Size(38, 38),
+                  maximumSize: const Size(38, 38),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero),
+              icon: const Icon(Icons.monitor_heart_rounded, size: 18),
             ),
             if (_isSuperAdministrator) ...[
               const SizedBox(width: 6),
@@ -207,6 +227,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     side: const BorderSide(color: Colors.white38),
                     minimumSize: const Size(38, 38),
                     maximumSize: const Size(38, 38),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     padding: EdgeInsets.zero),
                 icon: const Icon(Icons.analytics_rounded, size: 18),
               ),
@@ -431,8 +452,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   fontSize: 10, color: Colors.black38)),
                           const SizedBox(width: 5),
                           SizedBox(
+                            width: 30,
                             height: 30,
-                            child: OutlinedButton.icon(
+                            child: IconButton.outlined(
+                              tooltip: 'Download company-wise Excel',
                               onPressed:
                                   exportingCompanies ? null : _exportCompanies,
                               icon: exportingCompanies
@@ -443,8 +466,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           strokeWidth: 2))
                                   : const Icon(Icons.file_download_outlined,
                                       size: 15),
-                              label: const Text('EXCEL',
-                                  style: TextStyle(fontSize: 9)),
+                              style: IconButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(30, 30),
+                                maximumSize: const Size(30, 30),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
                             ),
                           ),
                         ])

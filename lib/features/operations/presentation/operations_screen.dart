@@ -20,7 +20,7 @@ class OperationsScreen extends StatefulWidget {
 }
 
 class _OperationsScreenState extends State<OperationsScreen> {
-  Map<String, dynamic>? alerts, insights, operations;
+  Map<String, dynamic>? alerts, insights, postEvent, operations;
   String? aiInsightSummary;
   Object? aiInsightError;
   Object? error;
@@ -42,13 +42,15 @@ class _OperationsScreenState extends State<OperationsScreen> {
       final values = await Future.wait([
         widget.repository.notifications(),
         widget.repository.insights(),
+        widget.repository.postEventIntelligence(),
         if (superAdmin) widget.repository.superAdminOperations()
       ]);
       if (mounted) {
         setState(() {
           alerts = values[0];
           insights = values[1];
-          if (superAdmin) operations = values[2];
+          postEvent = values[2];
+          if (superAdmin) operations = values[3];
           error = null;
         });
       }
@@ -285,11 +287,96 @@ class _OperationsScreenState extends State<OperationsScreen> {
         _chartCard(List.from(exhibitors['topCompanies'] ?? []),
             labelKey: 'label', valueKey: 'checkIns', sentenceLabels: false),
         const SizedBox(height: 16),
+        _postEventIntelligence(),
+        const SizedBox(height: 16),
         _title('AI EXECUTIVE SUMMARY'),
         _aiSummaryCard(),
       ]),
     );
   }
+
+  Widget _postEventIntelligence() {
+    final overview = Map<String, dynamic>.from(postEvent?['overview'] ?? {});
+    final participation =
+        Map<String, dynamic>.from(postEvent?['participation'] ?? {});
+    final buyerQuality =
+        Map<String, dynamic>.from(postEvent?['buyerQuality'] ?? {});
+    final peak = List.from(postEvent?['peakHours'] ?? []);
+    final days = List.from(postEvent?['dayWise'] ?? []);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _title('POST-EVENT INTELLIGENCE'),
+      Row(children: [
+        Expanded(
+            child: _insightCard(
+                'No-shows', overview['noShows'], Icons.person_off_rounded)),
+        const SizedBox(width: 6),
+        Expanded(
+            child: _insightCard('Returning', overview['returnVisitors'],
+                Icons.replay_circle_filled_rounded)),
+        const SizedBox(width: 6),
+        Expanded(
+            child: _insightCard('Total entries', overview['totalCheckIns'],
+                Icons.login_rounded)),
+      ]),
+      const SizedBox(height: 10),
+      _title('PARTICIPATION RATE'),
+      _participationCard(participation),
+      const SizedBox(height: 12),
+      _title('PEAK ENTRY HOURS'),
+      _chartCard(peak, labelKey: 'label', valueKey: 'count'),
+      const SizedBox(height: 12),
+      _title('DAY RETENTION'),
+      _verticalBarChart(days, labelKey: 'day', valueKey: 'unique'),
+      const SizedBox(height: 12),
+      _title('BUYER QUALITY'),
+      Row(children: [
+        Expanded(
+            child: _insightCard(
+                'Attended', buyerQuality['total'], Icons.handshake_rounded)),
+        const SizedBox(width: 6),
+        Expanded(
+            child: _insightCard('International', buyerQuality['international'],
+                Icons.public_rounded)),
+        const SizedBox(width: 6),
+        Expanded(
+            child: _insightCard('Returned', buyerQuality['returning'],
+                Icons.workspace_premium_rounded)),
+      ]),
+    ]);
+  }
+
+  Widget _participationCard(Map<String, dynamic> data) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+              children: ['visitors', 'buyers', 'exhibitors'].map((key) {
+            final item = Map<String, dynamic>.from(data[key] ?? {});
+            final registered = numberValue(item['registered']);
+            final attended = numberValue(item['attended']);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(children: [
+                Row(children: [
+                  Expanded(
+                      child: Text(sentenceCase(key),
+                          style: const TextStyle(
+                              fontSize: 9.5, fontWeight: FontWeight.w800))),
+                  Text('${attended.round()}/${registered.round()}',
+                      style: const TextStyle(
+                          fontSize: 9.5, fontWeight: FontWeight.w900)),
+                ]),
+                const SizedBox(height: 4),
+                LinearProgressIndicator(
+                    value: registered == 0
+                        ? 0
+                        : (attended / registered).clamp(0, 1),
+                    minHeight: 7,
+                    borderRadius: BorderRadius.circular(5)),
+              ]),
+            );
+          }).toList()),
+        ),
+      );
 
   Widget _aiSummaryCard() => Container(
         width: double.infinity,

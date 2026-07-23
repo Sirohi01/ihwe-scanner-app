@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../attendance/data/attendance_repository.dart';
 import '../../../attendance/domain/attendance_categories.dart';
 import '../../../attendance/domain/attendance_models.dart';
+import '../../../dashboard/presentation/company_detail_screen.dart';
 
 class PersonConfirmationSheet extends StatefulWidget {
   const PersonConfirmationSheet({
@@ -32,6 +33,8 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
   bool loading = false;
   bool changingStatus = false;
   late String buyerStatus;
+  Map<String, dynamic>? concierge;
+  Object? conciergeError;
 
   bool get isInternationalBuyer =>
       widget.result.person.subType == 'international-buyer';
@@ -47,6 +50,17 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
         .where((day) => !widget.result.attendedDays.contains(day))
         .toList();
     if (open.isNotEmpty && canMark) selected.add(open.first);
+    if (widget.result.person.type == 'buyer') _loadConcierge();
+  }
+
+  Future<void> _loadConcierge() async {
+    try {
+      final value =
+          await widget.repository.buyerConcierge(widget.result.person.id);
+      if (mounted) setState(() => concierge = value);
+    } catch (error) {
+      if (mounted) setState(() => conciergeError = error);
+    }
   }
 
   Future<void> changeBuyerStatus(String status) async {
@@ -161,6 +175,10 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
                   if (isInternationalBuyer) ...[
                     const SizedBox(height: 10),
                     _buyerApprovalPanel(),
+                  ],
+                  if (person.type == 'buyer') ...[
+                    const SizedBox(height: 10),
+                    _conciergePanel(),
                   ],
                   if (widget.result.attendance.isNotEmpty) ...[
                     const SizedBox(height: 10),
@@ -440,6 +458,129 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
           _statusButton('Rejected', Icons.close_rounded, Colors.red),
         ]),
       ]),
+    );
+  }
+
+  Widget _conciergePanel() {
+    final recommendations =
+        List<Map<String, dynamic>>.from(concierge?['recommendations'] ?? []);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF5FF),
+        border: Border.all(color: const Color(0xFFBED3EC)),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.connect_without_contact_rounded,
+              color: Color(0xFF225D9C), size: 18),
+          SizedBox(width: 7),
+          Expanded(
+            child: Text('MEETING CONCIERGE',
+                style: TextStyle(
+                    color: Color(0xFF225D9C),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .8)),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        if (concierge == null && conciergeError == null)
+          const Row(children: [
+            SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 8),
+            Text('Matching buyer interests with exhibitors...',
+                style: TextStyle(fontSize: 9.5)),
+          ])
+        else if (conciergeError != null)
+          TextButton.icon(
+              onPressed: _loadConcierge,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Retry recommendations'))
+        else if (recommendations.isEmpty)
+          const Text('No strong exhibitor match found yet.',
+              style: TextStyle(fontSize: 9.5))
+        else
+          ...recommendations.take(4).map(_recommendationCard),
+      ]),
+    );
+  }
+
+  Widget _recommendationCard(Map<String, dynamic> item) {
+    final products = List.from(item['products'] ?? []);
+    final reasons = List.from(item['reasons'] ?? []);
+    final logo = resolveApiAssetUrl(item['logo']);
+    return InkWell(
+      onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => CompanyDetailScreen(
+                  companyId: item['companyId'].toString(),
+                  repository: widget.repository))),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 7),
+        padding: const EdgeInsets.all(9),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFD8E4F0))),
+        child: Row(children: [
+          CircleAvatar(
+              radius: 21,
+              backgroundColor: Colors.white,
+              backgroundImage: logo.isNotEmpty ? NetworkImage(logo) : null,
+              child: logo.isEmpty
+                  ? const Icon(Icons.storefront_rounded, color: AppColors.green)
+                  : null),
+          const SizedBox(width: 9),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                    child: Text(item['company']?.toString() ?? 'Exhibitor',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 10.5, fontWeight: FontWeight.w900))),
+                Text('${item['matchPercent'] ?? 0}% match',
+                    style: const TextStyle(
+                        color: AppColors.green,
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900)),
+              ]),
+              Text(
+                  item['stallNumber']?.toString().isNotEmpty == true
+                      ? 'Stall ${item['stallNumber']}'
+                      : 'Ask help desk for stall',
+                  style: const TextStyle(
+                      color: Color(0xFF225D9C),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800)),
+              if (products.isNotEmpty || reasons.isNotEmpty)
+                Text(
+                    products.isNotEmpty
+                        ? products
+                            .take(2)
+                            .map((product) => product['name'])
+                            .join(' • ')
+                        : 'Matched: ${reasons.take(3).join(', ')}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 8.5)),
+              Text(item['navigation']?.toString() ?? '',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 8, color: Colors.black45)),
+            ]),
+          ),
+          const Icon(Icons.chevron_right_rounded, size: 17),
+        ]),
+      ),
     );
   }
 

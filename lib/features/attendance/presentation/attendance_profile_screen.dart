@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_skeleton.dart';
 import '../data/attendance_repository.dart';
 import '../domain/attendance_categories.dart';
+import '../../dashboard/presentation/company_detail_screen.dart';
 import 'ai_summary_dialog.dart';
 
 class AttendanceProfileScreen extends StatefulWidget {
@@ -25,7 +26,9 @@ class AttendanceProfileScreen extends StatefulWidget {
 
 class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
   Map<String, dynamic>? data;
+  Map<String, dynamic>? concierge;
   Object? error;
+  Object? conciergeError;
 
   @override
   void initState() {
@@ -37,9 +40,44 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
     try {
       final value =
           await widget.repository.attendanceProfile(widget.attendanceId);
-      if (mounted) setState(() => data = value);
+      final profile = Map<String, dynamic>.from(value['profile'] ?? {});
+      final buyer = _isBuyer(profile);
+      final buyerId = profile['subjectId']?.toString() ?? '';
+      if (mounted) {
+        setState(() {
+          data = value;
+          error = null;
+          concierge = null;
+          conciergeError = null;
+        });
+      }
+      if (buyer && buyerId.isNotEmpty) {
+        await _loadConcierge(buyerId);
+      }
     } catch (e) {
       if (mounted) setState(() => error = e);
+    }
+  }
+
+  bool _isBuyer(Map<String, dynamic> profile) =>
+      profile['subjectType']?.toString().toLowerCase() == 'buyer' ||
+      profile['subjectSubType']
+              ?.toString()
+              .toLowerCase()
+              .contains('buyer') ==
+          true;
+
+  Future<void> _loadConcierge(String buyerId) async {
+    try {
+      final value = await widget.repository.buyerConcierge(buyerId);
+      if (mounted) {
+        setState(() {
+          concierge = value;
+          conciergeError = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => conciergeError = e);
     }
   }
 
@@ -163,6 +201,10 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
             ]),
           ),
         ),
+        if (_isBuyer(profile)) ...[
+          const SizedBox(height: 10),
+          _conciergePanel(profile['subjectId']?.toString() ?? ''),
+        ],
         const SizedBox(height: 13),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('ATTENDANCE DAYS',
@@ -181,6 +223,140 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
         ...attendance.map(_attendanceDay),
         ..._detailSections(profile['details']),
       ],
+    );
+  }
+
+  Widget _conciergePanel(String buyerId) {
+    final recommendations =
+        List<Map<String, dynamic>>.from(concierge?['recommendations'] ?? []);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF5FF),
+        border: Border.all(color: const Color(0xFFBED3EC)),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.connect_without_contact_rounded,
+              color: Color(0xFF225D9C), size: 18),
+          SizedBox(width: 7),
+          Expanded(
+            child: Text('MEETING CONCIERGE',
+                style: TextStyle(
+                    color: Color(0xFF225D9C),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .8)),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        if (buyerId.isEmpty)
+          const Text('Buyer identity is unavailable for recommendations.',
+              style: TextStyle(fontSize: 9.5))
+        else if (concierge == null && conciergeError == null)
+          const Row(children: [
+            SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 8),
+            Expanded(
+                child: Text('Matching buyer interests with exhibitors...',
+                    style: TextStyle(fontSize: 9.5))),
+          ])
+        else if (conciergeError != null)
+          TextButton.icon(
+              onPressed: buyerId.isEmpty
+                  ? null
+                  : () {
+                      setState(() => conciergeError = null);
+                      _loadConcierge(buyerId);
+                    },
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Retry recommendations'))
+        else if (recommendations.isEmpty)
+          const Text('No strong exhibitor match found yet.',
+              style: TextStyle(fontSize: 9.5))
+        else
+          ...recommendations.take(4).map(_recommendationCard),
+      ]),
+    );
+  }
+
+  Widget _recommendationCard(Map<String, dynamic> item) {
+    final products = List.from(item['products'] ?? []);
+    final reasons = List.from(item['reasons'] ?? []);
+    final logo = resolveApiAssetUrl(item['logo']);
+    final companyId = item['companyId']?.toString() ?? '';
+    return InkWell(
+      onTap: companyId.isEmpty
+          ? null
+          : () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => CompanyDetailScreen(
+                      companyId: companyId, repository: widget.repository))),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 7),
+        padding: const EdgeInsets.all(9),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFD8E4F0))),
+        child: Row(children: [
+          CircleAvatar(
+              radius: 21,
+              backgroundColor: Colors.white,
+              backgroundImage: logo.isNotEmpty ? NetworkImage(logo) : null,
+              child: logo.isEmpty
+                  ? const Icon(Icons.storefront_rounded, color: AppColors.green)
+                  : null),
+          const SizedBox(width: 9),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                    child: Text(item['company']?.toString() ?? 'Exhibitor',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 10.5, fontWeight: FontWeight.w900))),
+                Text('${item['matchPercent'] ?? 0}% match',
+                    style: const TextStyle(
+                        color: AppColors.green,
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900)),
+              ]),
+              Text(
+                  item['stallNumber']?.toString().isNotEmpty == true
+                      ? 'Stall ${item['stallNumber']}'
+                      : 'Ask help desk for stall',
+                  style: const TextStyle(
+                      color: Color(0xFF225D9C),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800)),
+              if (products.isNotEmpty || reasons.isNotEmpty)
+                Text(
+                    products.isNotEmpty
+                        ? products
+                            .take(2)
+                            .map((product) => product['name'])
+                            .join(' • ')
+                        : 'Matched: ${reasons.take(3).join(', ')}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 8.5)),
+              Text(item['navigation']?.toString() ?? '',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 8, color: Colors.black45)),
+            ]),
+          ),
+          const Icon(Icons.chevron_right_rounded, size: 17),
+        ]),
+      ),
     );
   }
 

@@ -296,6 +296,7 @@ class _EmployeeOperationsScreenState extends State<EmployeeOperationsScreen> {
         .toList();
     return ListView(padding: const EdgeInsets.only(bottom: 80), children: [
       header(),
+      _deviceHealthSection(),
       const Padding(
         padding: EdgeInsets.fromLTRB(14, 0, 14, 7),
         child: Text('EMPLOYEE INFORMATION',
@@ -315,7 +316,7 @@ class _EmployeeOperationsScreenState extends State<EmployeeOperationsScreen> {
               crossAxisCount: 2,
               mainAxisSpacing: 0,
               crossAxisSpacing: 14,
-              childAspectRatio: 3.45),
+              mainAxisExtent: 46),
           itemCount: fields.length,
           itemBuilder: (_, index) =>
               _profileField(fields[index].key, fields[index].value),
@@ -350,6 +351,133 @@ class _EmployeeOperationsScreenState extends State<EmployeeOperationsScreen> {
         ),
     ]);
   }
+
+  Widget _deviceHealthSection() {
+    final raw = data!['deviceHealth'];
+    final health = raw is Map
+        ? Map<String, dynamic>.from(raw)
+        : <String, dynamic>{};
+    final reportedAt =
+        DateTime.tryParse(health['lastReportedAt']?.toString() ?? '');
+    final lastScan =
+        DateTime.tryParse(health['lastSuccessfulScan']?.toString() ?? '');
+    final hasReport = health.isNotEmpty;
+    final deviceName =
+        '${health['manufacturer'] ?? ''} ${health['model'] ?? ''}'.trim();
+    final online = health['apiStatus'] == 'online' &&
+        health['databaseStatus'] == 'online';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F8F6),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.green.withValues(alpha: .18)),
+        ),
+        child: hasReport
+            ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: (online ? AppColors.emerald : Colors.orange)
+                          .withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                        online
+                            ? Icons.health_and_safety_rounded
+                            : Icons.warning_amber_rounded,
+                        color: online ? AppColors.emerald : Colors.orange,
+                        size: 19),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('DEVICE HEALTH',
+                              style: TextStyle(
+                                  fontSize: 9,
+                                  letterSpacing: 1,
+                                  fontWeight: FontWeight.w900)),
+                          Text(
+                              reportedAt == null
+                                  ? 'Last report unavailable'
+                                  : 'Reported ${DateFormat('d MMM, h:mm a').format(reportedAt.toLocal())}',
+                              style: const TextStyle(
+                                  fontSize: 8, color: Colors.black45)),
+                        ]),
+                  ),
+                  Text(online ? 'Healthy' : 'Attention',
+                      style: TextStyle(
+                          color: online ? AppColors.emerald : Colors.orange,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900)),
+                ]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                      child: _healthValue('Device',
+                          deviceName.isEmpty ? 'Unknown device' : deviceName)),
+                  Expanded(
+                      child: _healthValue('Android',
+                          '${health['androidVersion'] ?? '-'} (SDK ${health['sdkInt'] ?? '-'})')),
+                ]),
+                const SizedBox(height: 7),
+                Row(children: [
+                  Expanded(
+                      child: _healthValue(
+                          'Camera',
+                          health['cameraAvailable'] == true &&
+                                  health['cameraPermissionGranted'] == true
+                              ? 'Ready'
+                              : 'Check required')),
+                  Expanded(
+                      child: _healthValue('API latency',
+                          '${health['roundTripMs'] ?? '-'} ms')),
+                ]),
+                const SizedBox(height: 7),
+                _healthValue(
+                    'Last successful scan',
+                    lastScan == null
+                        ? 'No scan reported'
+                        : DateFormat('d MMM yyyy, h:mm:ss a')
+                            .format(lastScan.toLocal())),
+              ])
+            : const Row(children: [
+                Icon(Icons.phonelink_erase_rounded,
+                    color: Colors.black38, size: 22),
+                SizedBox(width: 9),
+                Expanded(
+                    child: Text(
+                        'DEVICE HEALTH\nNo device report yet. It will appear when this employee opens the attendance app.',
+                        style: TextStyle(
+                            fontSize: 8.5,
+                            height: 1.35,
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w700))),
+              ]),
+      ),
+    );
+  }
+
+  Widget _healthValue(String title, String value) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title,
+            style: const TextStyle(
+                fontSize: 7,
+                color: Colors.black45,
+                fontWeight: FontWeight.w800)),
+        const SizedBox(height: 1),
+        Text(value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900)),
+      ]);
 
   Widget _profileField(String key, dynamic raw) {
     final value = _profileValue(key, raw);

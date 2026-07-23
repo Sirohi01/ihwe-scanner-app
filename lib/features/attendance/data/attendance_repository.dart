@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/session_store.dart';
@@ -60,7 +61,58 @@ class AttendanceRepository {
       {String source = 'qr'}) async {
     final result = await api
         .post('/attendance/mark', {'raw': raw, 'days': days, 'source': source});
+    final created = List<Map<String, dynamic>>.from(result['data']['results'])
+        .any((item) => item['created'] == true);
+    if (created) {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+          'last_successful_scan', DateTime.now().toIso8601String());
+      syncDeviceHealth();
+    }
     return List<Map<String, dynamic>>.from(result['data']['results']);
+  }
+
+  Future<Map<String, dynamic>> buyerConcierge(String buyerId) async =>
+      Map<String, dynamic>.from(
+          (await api.get('/attendance/buyer-concierge/$buyerId'))['data']);
+
+  Future<Map<String, dynamic>> companyTimeline(String companyId) async =>
+      Map<String, dynamic>.from(
+          (await api.get('/attendance/companies/$companyId/timeline'))['data']);
+
+  Future<Map<String, dynamic>> deviceHealth() async =>
+      Map<String, dynamic>.from(
+          (await api.get('/attendance/device-health'))['data']);
+
+  Future<Map<String, dynamic>> postEventIntelligence() async =>
+      Map<String, dynamic>.from(
+          (await api.get('/attendance/post-event-intelligence'))['data']);
+
+  Future<String?> lastSuccessfulScan() async =>
+      (await SharedPreferences.getInstance()).getString('last_successful_scan');
+
+  Future<Map<String, dynamic>> localDeviceHealth() async =>
+      Map<String, dynamic>.from(
+          await _files.invokeMethod('deviceHealth') ?? <String, dynamic>{});
+
+  Future<void> syncDeviceHealth() async {
+    try {
+      final watch = Stopwatch()..start();
+      final values = await Future.wait([
+        deviceHealth(),
+        localDeviceHealth(),
+        lastSuccessfulScan(),
+      ]);
+      watch.stop();
+      await api.post('/attendance/device-health/snapshot', {
+        'server': values[0],
+        'local': values[1],
+        'lastSuccessfulScan': values[2],
+        'roundTripMs': watch.elapsedMilliseconds,
+      });
+    } catch (_) {
+      // Health reporting must never block normal attendance operations.
+    }
   }
 
   Future<String> updateBuyerStatus(String buyerId, String status) async {

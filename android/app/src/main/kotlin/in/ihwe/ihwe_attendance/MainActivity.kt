@@ -1,6 +1,8 @@
 package `in`.ihwe.ihwe_attendance
 
+import android.Manifest
 import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -15,6 +17,17 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, fileChannel)
             .setMethodCallHandler { call, result ->
+                if (call.method == "deviceHealth") {
+                    result.success(mapOf(
+                        "cameraAvailable" to packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY),
+                        "cameraPermissionGranted" to (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED),
+                        "androidVersion" to Build.VERSION.RELEASE,
+                        "sdkInt" to Build.VERSION.SDK_INT,
+                        "manufacturer" to Build.MANUFACTURER,
+                        "model" to Build.MODEL
+                    ))
+                    return@setMethodCallHandler
+                }
                 if (call.method != "saveToDownloads") {
                     result.notImplemented()
                     return@setMethodCallHandler
