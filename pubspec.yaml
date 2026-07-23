@@ -38,6 +38,12 @@ dependencies:
   intl: ^0.19.0
   mobile_scanner: 6.0.2
   shared_preferences: ^2.3.3
+  file_picker: ^11.0.2
+  socket_io_client: ^3.1.6
+  url_launcher: ^6.3.2
+  # Legacy Android texture path compatible with this Flutter 3.27 project.
+  flutter_webrtc: 0.9.48+hotfix.1
+  flutter_local_notifications: ^19.5.0
 
 dev_dependencies:
   flutter_test:

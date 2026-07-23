@@ -61,10 +61,7 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
 
   bool _isBuyer(Map<String, dynamic> profile) =>
       profile['subjectType']?.toString().toLowerCase() == 'buyer' ||
-      profile['subjectSubType']
-              ?.toString()
-              .toLowerCase()
-              .contains('buyer') ==
+      profile['subjectSubType']?.toString().toLowerCase().contains('buyer') ==
           true;
 
   Future<void> _loadConcierge(String buyerId) async {
@@ -424,9 +421,9 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
   }
 
   Future<void> _correctAttendance(Map<String, dynamic> item) async {
-    final reason = TextEditingController();
     final days = List<String>.from(data?['days'] ?? []);
     String selectedDay = item['eventDay']?.toString() ?? '';
+    String reason = '';
     final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => StatefulBuilder(
@@ -446,9 +443,9 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
                         onChanged: (value) => setDialogState(
                             () => selectedDay = value ?? selectedDay)),
                     const SizedBox(height: 9),
-                    TextField(
-                        controller: reason,
+                    TextFormField(
                         maxLines: 2,
+                        onChanged: (value) => reason = value,
                         decoration: const InputDecoration(
                             labelText: 'Correction reason *')),
                   ]),
@@ -457,28 +454,28 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
                         onPressed: () => Navigator.pop(context, false),
                         child: const Text('Cancel')),
                     FilledButton(
-                        onPressed: () => Navigator.pop(
-                            context, reason.text.trim().isNotEmpty),
+                        onPressed: () =>
+                            Navigator.pop(context, reason.trim().isNotEmpty),
                         child: const Text('Save correction'))
                   ],
                 )));
     if (confirmed == true) {
       await widget.repository.correctAttendance(item['_id'].toString(),
-          reason: reason.text.trim(), day: selectedDay);
+          reason: reason.trim(), day: selectedDay);
       await load();
     }
-    reason.dispose();
   }
 
   Future<void> _removeAttendance(Map<String, dynamic> item) async {
-    final reason = TextEditingController();
+    String reason = '';
     final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
                 title: const Text('Remove attendance?'),
-                content: TextField(
-                    controller: reason,
+                scrollable: true,
+                content: TextFormField(
                     maxLines: 2,
+                    onChanged: (value) => reason = value,
                     decoration:
                         const InputDecoration(labelText: 'Removal reason *')),
                 actions: [
@@ -489,15 +486,14 @@ class _AttendanceProfileScreenState extends State<AttendanceProfileScreen> {
                       style:
                           FilledButton.styleFrom(backgroundColor: Colors.red),
                       onPressed: () =>
-                          Navigator.pop(context, reason.text.trim().isNotEmpty),
+                          Navigator.pop(context, reason.trim().isNotEmpty),
                       child: const Text('Remove'))
                 ]));
     if (confirmed == true) {
       await widget.repository
-          .removeAttendance(item['_id'].toString(), reason.text.trim());
+          .removeAttendance(item['_id'].toString(), reason.trim());
       await load();
     }
-    reason.dispose();
   }
 
   List<Widget> _detailSections(dynamic raw) {

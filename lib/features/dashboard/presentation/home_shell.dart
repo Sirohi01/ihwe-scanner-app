@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../../history/presentation/history_screen.dart';
 import '../../scanner/presentation/scanner_screen.dart';
+import '../../communications/data/communication_realtime_service.dart';
+import '../../communications/presentation/communication_call_screen.dart';
 import 'dashboard_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -13,10 +17,108 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int index = 0;
   int refreshKey = 0;
   late final repository = AttendanceRepository(widget.session);
+  StreamSubscription<Map<String, dynamic>>? callSubscription;
+  bool callPromptOpen = false;
+  String? promptedCallId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    CommunicationRealtimeService.instance.connect(widget.session);
+    callSubscription =
+        CommunicationRealtimeService.instance.calls.listen(_incomingCall);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    CommunicationRealtimeService.instance.disconnect();
+    callSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      CommunicationRealtimeService.instance.connect(widget.session);
+    }
+  }
+
+  Future<void> _incomingCall(Map<String, dynamic> event) async {
+    final eventCallId = (event['_id'] ?? event['callId'])?.toString();
+    if (event['event'] == 'ended' &&
+        callPromptOpen &&
+        eventCallId == promptedCallId &&
+        mounted) {
+      Navigator.of(context, rootNavigator: true).pop(false);
+      return;
+    }
+    if (event['event'] != 'incoming' ||
+        callPromptOpen ||
+        !mounted ||
+        eventCallId == null) {
+      return;
+    }
+    callPromptOpen = true;
+    promptedCallId = eventCallId;
+    final video = event['type'] == 'video';
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(video ? Icons.videocam_rounded : Icons.call_rounded,
+            color: AppColors.green, size: 36),
+        title: Text(event['callerName']?.toString() ?? 'Incoming IHWE call'),
+        content: Text(
+            video ? 'Incoming secure video call' : 'Incoming secure audio call',
+            textAlign: TextAlign.center),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            icon: const Icon(Icons.call_end_rounded),
+            label: const Text('Reject'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.emerald),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.call_rounded),
+            label: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+    callPromptOpen = false;
+    promptedCallId = null;
+    if (!mounted) return;
+    if (accepted == true) {
+      await Navigator.push(
+          context,
+          MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => CommunicationCallScreen(
+                  call: event,
+                  person: {
+                    '_id': event['callerId'],
+                    'fullName': event['callerName'],
+                    'profileImage': event['callerImage']
+                  },
+                  repository: repository,
+                  isCaller: false)));
+    } else {
+      try {
+        await repository.updateCommunicationCall(eventCallId, 'reject');
+      } catch (_) {
+        // The call may already be rejected, ended, or marked missed.
+      }
+    }
+  }
 
   void openScanner() => Navigator.of(context)
           .push(MaterialPageRoute(

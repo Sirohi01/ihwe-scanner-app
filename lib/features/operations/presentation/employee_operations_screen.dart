@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/storage/session_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_skeleton.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/ai_summary_dialog.dart';
+import '../../communications/presentation/communication_thread_screen.dart';
 
 class EmployeeOperationsScreen extends StatefulWidget {
   const EmployeeOperationsScreen(
-      {super.key, required this.userId, required this.repository});
+      {super.key,
+      required this.userId,
+      required this.repository,
+      required this.session});
   final String userId;
   final AttendanceRepository repository;
+  final SessionStore session;
   @override
   State<EmployeeOperationsScreen> createState() =>
       _EmployeeOperationsScreenState();
@@ -55,6 +61,10 @@ class _EmployeeOperationsScreenState extends State<EmployeeOperationsScreen> {
               title: Text(name),
               actions: [
                 IconButton(
+                    tooltip: 'Message employee',
+                    onPressed: data == null ? null : _openConversation,
+                    icon: const Icon(Icons.forum_outlined)),
+                IconButton(
                     onPressed: () => showAiSummaryDialog(context,
                         repository: widget.repository,
                         scope: 'employee',
@@ -75,6 +85,21 @@ class _EmployeeOperationsScreenState extends State<EmployeeOperationsScreen> {
                           onPressed: load, child: Text('Retry: $error')))
               : TabBarView(children: [summary(), activity(), profile()]),
         ));
+  }
+
+  Future<void> _openConversation() async {
+    final conversation =
+        await widget.repository.openEmployeeConversation(widget.userId);
+    if (!mounted) return;
+    final person = Map<String, dynamic>.from(data?['user'] ?? {});
+    await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => CommunicationThreadScreen(
+                conversationId: conversation['_id'].toString(),
+                person: person,
+                repository: widget.repository,
+                session: widget.session)));
   }
 
   Widget header() {
@@ -354,9 +379,8 @@ class _EmployeeOperationsScreenState extends State<EmployeeOperationsScreen> {
 
   Widget _deviceHealthSection() {
     final raw = data!['deviceHealth'];
-    final health = raw is Map
-        ? Map<String, dynamic>.from(raw)
-        : <String, dynamic>{};
+    final health =
+        raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
     final reportedAt =
         DateTime.tryParse(health['lastReportedAt']?.toString() ?? '');
     final lastScan =
@@ -364,8 +388,8 @@ class _EmployeeOperationsScreenState extends State<EmployeeOperationsScreen> {
     final hasReport = health.isNotEmpty;
     final deviceName =
         '${health['manufacturer'] ?? ''} ${health['model'] ?? ''}'.trim();
-    final online = health['apiStatus'] == 'online' &&
-        health['databaseStatus'] == 'online';
+    final online =
+        health['apiStatus'] == 'online' && health['databaseStatus'] == 'online';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
@@ -437,8 +461,8 @@ class _EmployeeOperationsScreenState extends State<EmployeeOperationsScreen> {
                               ? 'Ready'
                               : 'Check required')),
                   Expanded(
-                      child: _healthValue('API latency',
-                          '${health['roundTripMs'] ?? '-'} ms')),
+                      child: _healthValue(
+                          'API latency', '${health['roundTripMs'] ?? '-'} ms')),
                 ]),
                 const SizedBox(height: 7),
                 _healthValue(

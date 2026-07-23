@@ -54,6 +54,20 @@ class ApiClient {
     return response;
   }
 
+  Future<Map<String, dynamic>> uploadFile(
+      String path, String fieldName, String filePath) async {
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll({
+        'ngrok-skip-browser-warning': 'true',
+        if (session.token != null) 'Authorization': 'Bearer ${session.token}',
+      })
+      ..files.add(await http.MultipartFile.fromPath(fieldName, filePath));
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    return _decode(response);
+  }
+
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         'ngrok-skip-browser-warning': 'true',

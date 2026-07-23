@@ -191,15 +191,17 @@ class _OperationsScreenState extends State<OperationsScreen> {
   double numberValue(dynamic v) => double.tryParse(v?.toString() ?? '0') ?? 0;
 
   Future<void> _editDailyTarget(int current) async {
-    final controller = TextEditingController(text: '$current');
+    var targetText = '$current';
     final value = await showDialog<int>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: const Text('Set daily target'),
-        content: TextField(
-          controller: controller,
+        content: TextFormField(
+          initialValue: targetText,
           autofocus: true,
           keyboardType: TextInputType.number,
+          onChanged: (value) => targetText = value,
           decoration: const InputDecoration(
               labelText: 'Expected check-ins per day',
               prefixIcon: Icon(Icons.track_changes_rounded)),
@@ -209,13 +211,12 @@ class _OperationsScreenState extends State<OperationsScreen> {
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel')),
           FilledButton(
-              onPressed: () => Navigator.pop(
-                  dialogContext, int.tryParse(controller.text.trim())),
+              onPressed: () =>
+                  Navigator.pop(dialogContext, int.tryParse(targetText.trim())),
               child: const Text('Save')),
         ],
       ),
     );
-    controller.dispose();
     if (value == null || value < 1) return;
     try {
       await widget.repository.updateDailyTarget(value);
@@ -665,7 +666,8 @@ class _OperationsScreenState extends State<OperationsScreen> {
                       MaterialPageRoute(
                           builder: (_) => EmployeeOperationsScreen(
                               userId: u['_id'].toString(),
-                              repository: widget.repository))),
+                              repository: widget.repository,
+                              session: widget.session))),
                   leading: CircleAvatar(
                       backgroundColor: AppColors.green.withValues(alpha: .1),
                       backgroundImage:

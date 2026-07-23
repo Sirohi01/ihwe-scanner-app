@@ -9,6 +9,7 @@ import '../../attendance/domain/attendance_categories.dart';
 import '../../attendance/presentation/attendance_profile_screen.dart';
 import '../../attendance/presentation/ai_summary_dialog.dart';
 import '../../operations/presentation/device_health_screen.dart';
+import '../../communications/presentation/communication_inbox_screen.dart';
 import 'company_detail_screen.dart';
 import 'directory_screen.dart';
 import '../../operations/presentation/operations_screen.dart';
@@ -178,7 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     textStyle: const TextStyle(
                         fontSize: 11, fontWeight: FontWeight.w900)),
                 icon: const Icon(Icons.qr_code_scanner_rounded, size: 17),
-                label: const Text('SCAN ENTRY QR')),
+                label: const Text('SCAN QR')),
             const SizedBox(width: 8),
             IconButton.outlined(
               tooltip: 'AI summary',
@@ -194,6 +195,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               icon: const Icon(Icons.auto_awesome_rounded,
                   color: AppColors.gold, size: 16),
+            ),
+            const SizedBox(width: 6),
+            IconButton.outlined(
+              tooltip: 'Messages',
+              onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => CommunicationInboxScreen(
+                          repository: widget.repository,
+                          session: widget.session))),
+              style: IconButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white38),
+                  minimumSize: const Size(38, 38),
+                  maximumSize: const Size(38, 38),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero),
+              icon: const Icon(Icons.forum_outlined, size: 18),
             ),
             const SizedBox(width: 6),
             IconButton.outlined(

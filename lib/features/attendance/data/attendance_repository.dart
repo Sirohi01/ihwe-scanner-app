@@ -88,6 +88,128 @@ class AttendanceRepository {
       Map<String, dynamic>.from(
           (await api.get('/attendance/post-event-intelligence'))['data']);
 
+  Future<List<Map<String, dynamic>>> communicationConversations() async =>
+      List<Map<String, dynamic>>.from(
+          (await api.get('/communications/conversations'))['data']);
+
+  Future<List<Map<String, dynamic>>> communicationEmployees() async =>
+      List<Map<String, dynamic>>.from(
+          (await api.get('/communications/employees'))['data']);
+
+  Future<Map<String, dynamic>> openEmployeeConversation(
+          String employeeId) async =>
+      Map<String, dynamic>.from((await api.post(
+          '/communications/conversations/$employeeId', const {}))['data']);
+
+  Future<List<Map<String, dynamic>>> communicationMessages(
+          String conversationId) async =>
+      List<Map<String, dynamic>>.from((await api.get(
+          '/communications/conversations/$conversationId/messages'))['data']);
+
+  Future<Map<String, dynamic>> sendCommunicationMessage(String conversationId,
+          String text, List<Map<String, dynamic>> attachments) async =>
+      Map<String, dynamic>.from((await api.post(
+          '/communications/conversations/$conversationId/messages',
+          {'text': text, 'attachments': attachments}))['data']);
+
+  Future<Map<String, dynamic>> uploadCommunicationAttachment(
+          String filePath) async =>
+      Map<String, dynamic>.from((await api.uploadFile(
+          '/communications/attachments', 'file', filePath))['data']);
+
+  Future<void> markCommunicationRead(String conversationId) async =>
+      api.patch('/communications/conversations/$conversationId/read', const {});
+
+  Future<Map<String, dynamic>> editCommunicationMessage(
+          String messageId, String text) async =>
+      Map<String, dynamic>.from(
+          (await api.patch('/communications/messages/$messageId', {
+        'text': text,
+      }))['data']);
+
+  Future<Map<String, dynamic>> deleteCommunicationMessage(
+          String messageId) async =>
+      Map<String, dynamic>.from(
+          (await api.delete('/communications/messages/$messageId'))['data']);
+
+  Future<List<Map<String, dynamic>>> communicationAudit(
+          String conversationId) async =>
+      List<Map<String, dynamic>>.from((await api
+          .get('/communications/conversations/$conversationId/audit'))['data']);
+
+  Future<Map<String, dynamic>> communicationAvailability() async =>
+      Map<String, dynamic>.from(
+          (await api.get('/communications/availability'))['data']);
+
+  Future<Map<String, dynamic>> updateCommunicationAvailability(
+          String availability, bool aiEnabled, String statusMessage) async =>
+      Map<String, dynamic>.from(
+          (await api.patch('/communications/availability', {
+        'availability': availability,
+        'aiAssistantEnabled': aiEnabled,
+        'statusMessage': statusMessage,
+      }))['data']);
+
+  Future<List<Map<String, dynamic>>> communicationTasks() async =>
+      List<Map<String, dynamic>>.from(
+          (await api.get('/communications/tasks'))['data']);
+
+  Future<Map<String, dynamic>> createCommunicationTask(
+          {required String employeeId,
+          required String title,
+          required String description,
+          required String priority,
+          String? dueAt}) async =>
+      Map<String, dynamic>.from((await api.post('/communications/tasks', {
+        'employeeId': employeeId,
+        'title': title,
+        'description': description,
+        'priority': priority,
+        if (dueAt != null) 'dueAt': dueAt,
+      }))['data']);
+
+  Future<Map<String, dynamic>> updateCommunicationTask(
+          String taskId, String status,
+          {List<Map<String, dynamic>> proofAttachments = const []}) async =>
+      Map<String, dynamic>.from(
+          (await api.patch('/communications/tasks/$taskId/status', {
+        'status': status,
+        'proofAttachments': proofAttachments,
+      }))['data']);
+
+  Future<int> sendCommunicationAnnouncement(String text) async =>
+      int.tryParse((await api.post(
+              '/communications/announcements', {'text': text}))['data']['sent']
+          .toString()) ??
+      0;
+
+  Future<Map<String, dynamic>> communicationAnalytics() async =>
+      Map<String, dynamic>.from(
+          (await api.get('/communications/analytics'))['data']);
+
+  Future<Map<String, dynamic>> communicationIceConfig() async =>
+      Map<String, dynamic>.from(
+          (await api.get('/communications/calls/ice-config'))['data']);
+
+  Future<Map<String, dynamic>> startCommunicationCall(
+          String conversationId, bool video) async =>
+      Map<String, dynamic>.from((await api.post('/communications/calls', {
+        'conversationId': conversationId,
+        'type': video ? 'video' : 'audio',
+      }))['data']);
+
+  Future<Map<String, dynamic>> updateCommunicationCall(
+          String callId, String action, {String reason = ''}) async =>
+      Map<String, dynamic>.from(
+          (await api.patch('/communications/calls/$callId', {
+        'action': action,
+        'reason': reason,
+      }))['data']);
+
+  Future<List<Map<String, dynamic>>> communicationCallHistory() async =>
+      List<Map<String, dynamic>>.from(
+          (await api.get('/communications/calls'))['data']);
+
   Future<String?> lastSuccessfulScan() async =>
       (await SharedPreferences.getInstance()).getString('last_successful_scan');
 
