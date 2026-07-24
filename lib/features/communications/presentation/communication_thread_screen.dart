@@ -10,7 +10,6 @@ import '../../../core/storage/session_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../data/communication_realtime_service.dart';
-import 'communication_call_screen.dart';
 
 class CommunicationThreadScreen extends StatefulWidget {
   const CommunicationThreadScreen({
@@ -243,14 +242,6 @@ class _CommunicationThreadScreenState extends State<CommunicationThreadScreen> {
           ),
         ]),
         actions: [
-          IconButton(
-              tooltip: 'Audio call',
-              onPressed: () => _startCall(false),
-              icon: const Icon(Icons.call_outlined)),
-          IconButton(
-              tooltip: 'Video call',
-              onPressed: () => _startCall(true),
-              icon: const Icon(Icons.videocam_outlined)),
           if (isSuperAdmin)
             PopupMenuButton<String>(
               onSelected: (value) {
@@ -649,28 +640,6 @@ class _CommunicationThreadScreenState extends State<CommunicationThreadScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Could not open this attachment.')));
-      }
-    }
-  }
-
-  Future<void> _startCall(bool video) async {
-    try {
-      final call = await widget.repository
-          .startCommunicationCall(widget.conversationId, video);
-      if (!mounted) return;
-      await Navigator.push(
-          context,
-          MaterialPageRoute(
-              fullscreenDialog: true,
-              builder: (_) => CommunicationCallScreen(
-                  call: call,
-                  person: widget.person,
-                  repository: widget.repository,
-                  isCaller: true)));
-    } catch (value) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Call failed: $value')));
       }
     }
   }

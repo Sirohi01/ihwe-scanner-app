@@ -21,6 +21,7 @@ class CommunicationTasksScreen extends StatefulWidget {
 class _CommunicationTasksScreenState extends State<CommunicationTasksScreen> {
   List<Map<String, dynamic>>? tasks;
   Object? error;
+  String? updatingTaskId;
 
   bool get isSuperAdmin {
     final role = widget.session.role
@@ -184,9 +185,17 @@ class _CommunicationTasksScreenState extends State<CommunicationTasksScreen> {
                 const SizedBox(width: 7),
                 Expanded(
                     child: FilledButton(
-                        onPressed: () =>
-                            _changeStatus(task, 'completed', proof: true),
-                        child: const Text('COMPLETE'))),
+                        onPressed: updatingTaskId == task['_id']?.toString()
+                            ? null
+                            : () =>
+                                _changeStatus(task, 'completed', proof: true),
+                        child: updatingTaskId == task['_id']?.toString()
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('COMPLETE'))),
               ],
             ]),
           ],
@@ -216,29 +225,79 @@ class _CommunicationTasksScreenState extends State<CommunicationTasksScreen> {
   Future<void> _changeStatus(Map<String, dynamic> task, String status,
       {bool proof = false}) async {
     final attachments = <Map<String, dynamic>>[];
-    if (proof) {
-      final picked = await FilePicker.pickFiles(
-          allowMultiple: true,
-          type: FileType.custom,
-          allowedExtensions: const [
-            'jpg',
-            'jpeg',
-            'png',
-            'webp',
-            'pdf',
-            'doc',
-            'docx'
-          ]);
-      for (final path
-          in (picked?.paths.whereType<String>() ?? const <String>[])) {
-        attachments
-            .add(await widget.repository.uploadCommunicationAttachment(path));
+    final taskId = task['_id'].toString();
+    try {
+      if (proof) {
+        final paths = await _pickProofFiles();
+        if (paths == null || paths.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Add at least one proof photo or document.')));
+          }
+          return;
+        }
+        if (mounted) setState(() => updatingTaskId = taskId);
+        for (final path in paths) {
+          attachments.add(
+              await widget.repository.uploadCommunicationAttachment(path));
+        }
+      }
+      await widget.repository.updateCommunicationTask(taskId, status,
+          proofAttachments: attachments);
+      await load();
+      if (mounted && status == 'completed') {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Task completed with proof successfully.')));
+      }
+    } catch (value) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not update task: $value')));
+      }
+    } finally {
+      if (mounted && updatingTaskId == taskId) {
+        setState(() => updatingTaskId = null);
       }
     }
-    await widget.repository.updateCommunicationTask(
-        task['_id'].toString(), status,
-        proofAttachments: attachments);
-    await load();
+  }
+
+  Future<List<String>?> _pickProofFiles() async {
+    final source = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(children: [
+          const ListTile(
+            title: Text('Add completion proof',
+                style: TextStyle(fontWeight: FontWeight.w900)),
+            subtitle: Text('Select one or more photos or documents.'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Gallery photos'),
+            onTap: () => Navigator.pop(sheetContext, 'photos'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('Documents'),
+            subtitle: const Text('PDF, DOC or DOCX'),
+            onTap: () => Navigator.pop(sheetContext, 'documents'),
+          ),
+        ]),
+      ),
+    );
+    if (source == null) return null;
+    final picked = source == 'photos'
+        ? await FilePicker.pickFiles(
+            allowMultiple: true,
+            type: FileType.image,
+          )
+        : await FilePicker.pickFiles(
+            allowMultiple: true,
+            type: FileType.custom,
+            allowedExtensions: const ['pdf', 'doc', 'docx'],
+          );
+    return picked?.paths.whereType<String>().toList();
   }
 
   Future<void> _createTask() async {

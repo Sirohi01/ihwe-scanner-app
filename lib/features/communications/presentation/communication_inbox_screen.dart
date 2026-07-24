@@ -7,7 +7,6 @@ import '../../../core/widgets/app_skeleton.dart';
 import '../../attendance/data/attendance_repository.dart';
 import 'communication_thread_screen.dart';
 import 'communication_tasks_screen.dart';
-import 'communication_call_history_screen.dart';
 
 class CommunicationInboxScreen extends StatefulWidget {
   const CommunicationInboxScreen(
@@ -79,14 +78,6 @@ class _CommunicationInboxScreenState extends State<CommunicationInboxScreen> {
             PopupMenuButton<String>(
               onSelected: (value) {
                 if (value == 'refresh') load();
-                if (value == 'calls') {
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => CommunicationCallHistoryScreen(
-                              repository: widget.repository,
-                              session: widget.session)));
-                }
                 if (value == 'availability') _availability();
                 if (value == 'announcement') _announcement();
                 if (value == 'analytics') _analytics();
@@ -94,8 +85,6 @@ class _CommunicationInboxScreenState extends State<CommunicationInboxScreen> {
               itemBuilder: (_) => [
                 const PopupMenuItem(
                     value: 'refresh', child: Text('Refresh conversations')),
-                const PopupMenuItem(
-                    value: 'calls', child: Text('Call history')),
                 if (isSuperAdmin)
                   const PopupMenuItem(
                       value: 'availability',
