@@ -83,7 +83,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       );
       if (!mounted || version != requestVersion) return;
       setState(() {
-        records = reset ? next : [...records, ...next];
+        final expanded = _expandPassActivities(next);
+        records = reset ? expanded : [...records, ...expanded];
         page = targetPage;
         hasMore = next.length == 50;
       });
@@ -95,6 +96,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
         });
       }
     }
+  }
+
+  List<Map<String, dynamic>> _expandPassActivities(
+      List<Map<String, dynamic>> source) {
+    final expanded = <Map<String, dynamic>>[];
+    for (final record in source) {
+      final history = List<Map<String, dynamic>>.from(
+          record['deliveryHistory'] ?? <Map<String, dynamic>>[]);
+      if (record['passType'] != 'lunch' || history.isEmpty) {
+        expanded.add(record);
+        continue;
+      }
+      var cumulative = 0;
+      for (final delivery in history) {
+        cumulative +=
+            int.tryParse(delivery['quantity']?.toString() ?? '') ?? 0;
+        expanded.add({
+          ...record,
+          'attendanceId': record['_id'],
+          '_id': '${record['_id']}:${delivery['_id'] ?? cumulative}',
+          'markedAt': delivery['deliveredAt'] ?? record['markedAt'],
+          'markedByName': delivery['deliveredByName'] ?? record['markedByName'],
+          'deliveredQuantity': delivery['quantity'] ?? 0,
+          'cumulativeDeliveredQuantity': cumulative,
+          'acknowledgementStatus':
+              delivery['acknowledgementStatus'] ?? 'pending',
+        });
+      }
+    }
+    expanded.sort((a, b) {
+      final aTime = DateTime.tryParse(a['markedAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = DateTime.tryParse(b['markedAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
+    return expanded;
   }
 
   @override
@@ -347,6 +385,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final detail = isCompanyEntry
         ? '${attendanceLabel(record['subjectSubType'] ?? '')} • ${record['registrationId'] ?? ''}'
         : '${company.isNotEmpty ? company : attendanceLabel(record['subjectSubType'] ?? '')} • ${attendanceLabel(record['subjectSubType'] ?? '')}';
+    final acknowledgement =
+        record['acknowledgementStatus']?.toString() ?? 'pending';
+    final acknowledgementLabel = acknowledgement == 'confirmed'
+        ? 'CONFIRMED'
+        : acknowledgement == 'disputed'
+            ? 'ISSUE REPORTED'
+            : 'PENDING CONFIRMATION';
+    final displayLabel = record['attendanceKind'] == 'pass'
+        ? record['passType'] == 'lunch'
+            ? '${record['deliveredQuantity'] ?? 0} lunch delivered [$acknowledgementLabel]'
+            : '$displayName [$acknowledgementLabel]'
+        : displayName;
     final photoUrl = resolveApiAssetUrl(record['photoUrl']);
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
@@ -370,7 +420,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       Icon(icon, color: AppColors.green))
               : Icon(icon, color: AppColors.green),
         ),
-        title: Text(displayName,
+        title: Text(displayLabel,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
@@ -406,7 +456,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   void _openProfile(Map<String, dynamic> record, bool isCompanyEntry) {
     final companyId = record['companyId']?.toString() ?? '';
-    final attendanceId = record['_id']?.toString() ?? '';
+    final attendanceId =
+        (record['attendanceId'] ?? record['_id'])?.toString() ?? '';
     if (isCompanyEntry && companyId.length == 24) {
       Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => CompanyDetailScreen(

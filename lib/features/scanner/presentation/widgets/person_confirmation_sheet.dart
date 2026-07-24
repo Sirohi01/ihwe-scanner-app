@@ -32,6 +32,7 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
   final selected = <String>{};
   bool loading = false;
   bool changingStatus = false;
+  int lunchQuantity = 1;
   late String buyerStatus;
   Map<String, dynamic>? concierge;
   Object? conciergeError;
@@ -39,6 +40,17 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
   bool get isInternationalBuyer =>
       widget.result.person.subType == 'international-buyer';
   bool get canMark => !isInternationalBuyer || buyerStatus == 'Approved';
+  bool get isLunch => widget.result.person.passType == 'lunch';
+  int get allocatedLunch =>
+      int.tryParse(widget.result.person.details['allocatedQuantity']?.toString() ?? '') ?? 1;
+  int deliveredForDay(String day) {
+    final record = widget.result.attendance.cast<Map<String, dynamic>?>().firstWhere(
+        (item) => item?['eventDay']?.toString() == day,
+        orElse: () => null);
+    return int.tryParse(record?['deliveredQuantity']?.toString() ?? '') ?? 0;
+  }
+  int remainingForDay(String day) =>
+      (allocatedLunch - deliveredForDay(day)).clamp(0, allocatedLunch);
 
   @override
   void initState() {
@@ -46,9 +58,8 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
     buyerStatus = widget.result.person.status.isEmpty
         ? 'Pending'
         : widget.result.person.status;
-    final open = widget.result.days
-        .where((day) => !widget.result.attendedDays.contains(day))
-        .toList();
+    final open = widget.result.days.where((day) =>
+        isLunch ? remainingForDay(day) > 0 : !widget.result.attendedDays.contains(day)).toList();
     if (open.isNotEmpty && canMark) selected.add(open.first);
     if (widget.result.person.type == 'buyer') _loadConcierge();
   }
@@ -101,12 +112,16 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
     setState(() => loading = true);
     try {
       final results = await widget.repository
-          .mark(widget.raw, selected.toList(), source: widget.source);
+          .mark(widget.raw, selected.toList(), source: widget.source,
+              quantity: isLunch ? lunchQuantity : null);
       if (!mounted) return;
-      final created = results.where((item) => item['created'] == true).length;
+      final created = results.where((item) =>
+          item['created'] == true || item['deliveryRecorded'] == true).length;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(created > 0
-            ? 'Attendance marked for $created day(s).'
+            ? isLunch
+                ? '$lunchQuantity lunch item(s) recorded for $created day(s).'
+                : 'Attendance marked for $created day(s).'
             : 'Attendance was already marked.'),
         backgroundColor: AppColors.emerald,
         behavior: SnackBarBehavior.floating,
@@ -196,13 +211,48 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
                               Icon(Icons.info_rounded,
                                   size: 17, color: AppColors.green),
                               SizedBox(width: 6),
-                              Text('ALREADY MARKED',
+                              Text('PREVIOUS ACTIVITY',
                                   style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w900,
                                       color: AppColors.green))
                             ]),
                             const SizedBox(height: 5),
+                            Builder(builder: (context) {
+                              final latest = widget.result.attendance.first;
+                              final status =
+                                  latest['acknowledgementStatus']?.toString() ??
+                                      'pending';
+                              final label = status == 'confirmed'
+                                  ? 'CONFIRMED BY EXHIBITOR'
+                                  : status == 'disputed'
+                                      ? 'ISSUE REPORTED BY EXHIBITOR'
+                                      : 'AWAITING EXHIBITOR CONFIRMATION';
+                              final color = status == 'confirmed'
+                                  ? AppColors.emerald
+                                  : status == 'disputed'
+                                      ? Colors.red.shade700
+                                      : Colors.orange.shade800;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(children: [
+                                  Icon(
+                                      status == 'confirmed'
+                                          ? Icons.verified_rounded
+                                          : status == 'disputed'
+                                              ? Icons.warning_rounded
+                                              : Icons.hourglass_top_rounded,
+                                      size: 15,
+                                      color: color),
+                                  const SizedBox(width: 5),
+                                  Text(label,
+                                      style: TextStyle(
+                                          fontSize: 8.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: color)),
+                                ]),
+                              );
+                            }),
                             ...widget.result.attendance.map((record) {
                               final at = DateTime.tryParse(
                                   record['markedAt']?.toString() ?? '');
@@ -220,10 +270,17 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
                     ),
                   ],
                   const SizedBox(height: 12),
+                  if (isLunch) ...[
+                    _lunchQuantitySelector(),
+                    const SizedBox(height: 12),
+                  ],
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('ATTENDANCE DAYS',
+                      Text(
+                          person.passType.isNotEmpty
+                              ? 'PASS ACTIVITY DAYS'
+                              : 'ATTENDANCE DAYS',
                           style: TextStyle(
                               fontSize: 10,
                               letterSpacing: 1.25,
@@ -328,12 +385,15 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
         if (!canMark) return;
         selected
           ..clear()
-          ..addAll(widget.result.days
-              .where((day) => !widget.result.attendedDays.contains(day)));
+          ..addAll(widget.result.days.where((day) => isLunch
+              ? remainingForDay(day) > 0
+              : !widget.result.attendedDays.contains(day)));
       });
 
   Widget _dayTile(String day) {
-    final done = widget.result.attendedDays.contains(day);
+    final delivered = deliveredForDay(day);
+    final remaining = remainingForDay(day);
+    final done = isLunch ? remaining == 0 : widget.result.attendedDays.contains(day);
     final checked = selected.contains(day);
     return Card(
       margin: const EdgeInsets.only(bottom: 7),
@@ -363,7 +423,9 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
         title: Text(DateFormat('EEEE, d MMMM').format(DateTime.parse(day)),
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
         subtitle: Text(
-          done
+          isLunch
+              ? '$delivered of $allocatedLunch delivered • $remaining remaining'
+              : done
               ? 'Already marked'
               : checked
                   ? 'Selected for entry'
@@ -371,6 +433,45 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
           style: TextStyle(
               fontSize: 9, color: done ? AppColors.emerald : Colors.black45),
         ),
+      ),
+    );
+  }
+
+  Widget _lunchQuantitySelector() {
+    final selectedRemaining = selected.isEmpty
+        ? allocatedLunch
+        : selected.map(remainingForDay).reduce((a, b) => a < b ? a : b);
+    if (lunchQuantity > selectedRemaining && selectedRemaining > 0) {
+      lunchQuantity = selectedRemaining;
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(children: [
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('LUNCH DELIVERY QUANTITY',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
+              SizedBox(height: 3),
+              Text('Enter how many lunches are being handed over now.',
+                  style: TextStyle(fontSize: 9, color: Colors.black54)),
+            ]),
+          ),
+          IconButton(
+            onPressed: lunchQuantity > 1
+                ? () => setState(() => lunchQuantity--)
+                : null,
+            icon: const Icon(Icons.remove_circle_outline),
+          ),
+          Text('$lunchQuantity',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          IconButton(
+            onPressed: lunchQuantity < selectedRemaining
+                ? () => setState(() => lunchQuantity++)
+                : null,
+            icon: const Icon(Icons.add_circle_outline),
+          ),
+        ]),
       ),
     );
   }
@@ -401,7 +502,9 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
                 ? 'APPROVE BUYER TO MARK ATTENDANCE'
                 : selected.isEmpty
                     ? 'SELECT AN EVENT DAY'
-                    : 'MARK ATTENDANCE • ${selected.length} DAY${selected.length == 1 ? '' : 'S'}'),
+                    : widget.result.person.passType.isNotEmpty
+                        ? 'RECORD ${widget.result.person.passType.toUpperCase()} ACTIVITY'
+                        : 'MARK ATTENDANCE | ${selected.length} DAY${selected.length == 1 ? '' : 'S'}'),
           ),
         ),
       );

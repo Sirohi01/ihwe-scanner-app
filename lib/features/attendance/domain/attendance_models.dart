@@ -12,7 +12,9 @@ class PersonProfile {
         country = json['country']?.toString() ?? '',
         photoUrl = json['photoUrl']?.toString() ?? '',
         photoKind = json['photoKind']?.toString() ?? 'person',
-        status = json['status']?.toString() ?? '';
+        status = json['status']?.toString() ?? '',
+        passType = json['passType']?.toString() ?? '',
+        details = Map<String, dynamic>.from(json['details'] ?? {});
   final String id,
       type,
       subType,
@@ -25,7 +27,9 @@ class PersonProfile {
       country,
       photoUrl,
       photoKind,
-      status;
+      status,
+      passType;
+  final Map<String, dynamic> details;
 }
 
 class ScanResult {

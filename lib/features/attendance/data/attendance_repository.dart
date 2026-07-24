@@ -58,9 +58,13 @@ class AttendanceRepository {
       api.delete('/attendance/$id', body: {'reason': reason});
 
   Future<List<Map<String, dynamic>>> mark(String raw, List<String> days,
-      {String source = 'qr'}) async {
-    final result = await api
-        .post('/attendance/mark', {'raw': raw, 'days': days, 'source': source});
+      {String source = 'qr', int? quantity}) async {
+    final result = await api.post('/attendance/mark', {
+      'raw': raw,
+      'days': days,
+      'source': source,
+      if (quantity != null) 'quantity': quantity,
+    });
     final created = List<Map<String, dynamic>>.from(result['data']['results'])
         .any((item) => item['created'] == true);
     if (created) {

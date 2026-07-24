@@ -143,7 +143,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
     final company = Map<String, dynamic>.from(data!['company']);
     final companyAttendance =
         List<Map<String, dynamic>>.from(data!['companyAttendance'] ?? []);
-    final allMemberAttendance = _groupMembers(
+    final allMemberAttendance = _activityEntries(
         List<Map<String, dynamic>>.from(data!['memberAttendance'] ?? []));
     final counts = <String, int>{
       for (final type in passLabels.keys)
@@ -306,7 +306,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
         sliver: SliverToBoxAdapter(
           child:
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('PRESENT TEAM MEMBERS',
+            const Text('PRESENT ACTIVITY',
                 style: TextStyle(
                     fontSize: 11,
                     letterSpacing: 1.2,
@@ -323,7 +323,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
       if (memberAttendance.isEmpty)
         const SliverFillRemaining(
             hasScrollBody: false,
-            child: Center(child: Text('No team member checked in yet.')))
+            child: Center(child: Text('No pass activity recorded yet.')))
       else
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
@@ -531,18 +531,40 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
         ),
       );
 
-  List<Map<String, dynamic>> _groupMembers(List<Map<String, dynamic>> records) {
-    final grouped = <String, Map<String, dynamic>>{};
+  List<Map<String, dynamic>> _activityEntries(
+      List<Map<String, dynamic>> records) {
+    final activities = <Map<String, dynamic>>[];
     for (final record in records) {
-      final key = record['subjectKey']?.toString() ??
-          record['registrationId']?.toString() ??
-          '';
-      final current =
-          grouped.putIfAbsent(key, () => {...record, 'days': <String>[]});
       final day = record['eventDay']?.toString() ?? '';
-      if (day.isNotEmpty) (current['days'] as List<String>).add(day);
+      final history = List<Map<String, dynamic>>.from(
+          record['deliveryHistory'] ?? <Map<String, dynamic>>[]);
+      if (_passType(record) == 'lunch' && history.isNotEmpty) {
+        var cumulative = 0;
+        for (final delivery in history) {
+          cumulative += int.tryParse(delivery['quantity']?.toString() ?? '') ?? 0;
+          activities.add({
+            ...record,
+            'attendanceId': record['_id'],
+            '_id': '${record['_id']}:${delivery['_id'] ?? cumulative}',
+            'markedAt': delivery['deliveredAt'] ?? record['markedAt'],
+            'markedByName':
+                delivery['deliveredByName'] ?? record['markedByName'],
+            'deliveredQuantity': delivery['quantity'] ?? 0,
+            'cumulativeDeliveredQuantity': cumulative,
+            'acknowledgementStatus':
+                delivery['acknowledgementStatus'] ?? 'pending',
+            'days': day.isEmpty ? <String>[] : <String>[day],
+          });
+        }
+      } else {
+        activities.add({
+          ...record,
+          'attendanceId': record['_id'],
+          'days': day.isEmpty ? <String>[] : <String>[day],
+        });
+      }
     }
-    return grouped.values.toList();
+    return activities;
   }
 
   String _passType(Map<String, dynamic> member) {
@@ -634,11 +656,23 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   Widget _memberCard(Map<String, dynamic> member) {
     final photo = resolveApiAssetUrl(member['photoUrl']);
     final days = List<String>.from(member['days'] ?? []);
+    final passType = _passType(member);
+    final isLunch = passType == 'lunch';
+    final delivered =
+        int.tryParse(member['deliveredQuantity']?.toString() ?? '') ?? 0;
+    final status = member['acknowledgementStatus']?.toString() ?? 'pending';
+    final statusLabel = status == 'confirmed'
+        ? 'Confirmed'
+        : status == 'disputed'
+            ? 'Issue reported'
+            : 'Awaiting confirmation';
+    final at = DateTime.tryParse(member['markedAt']?.toString() ?? '');
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
         onTap: () {
-          final attendanceId = member['_id']?.toString() ?? '';
+          final attendanceId =
+              (member['attendanceId'] ?? member['_id'])?.toString() ?? '';
           if (attendanceId.length == 24) {
             Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => AttendanceProfileScreen(
@@ -649,7 +683,10 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 10),
         leading: _memberPhoto(photo),
-        title: Text(member['name']?.toString() ?? 'Team member',
+        title: Text(
+            isLunch
+                ? '$delivered lunch delivered - $statusLabel'
+                : '${passLabels[passType] ?? attendanceLabel(member['subjectSubType'] ?? '')} pass activity',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
@@ -657,7 +694,9 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
             '${passLabels[_passType(member)] ?? attendanceLabel(member['subjectSubType'] ?? '')} Pass${member['designation']?.toString().isNotEmpty == true ? ' • ${member['designation']}' : ''}',
             style: const TextStyle(fontSize: 9)),
         trailing: Text(
-            days.isEmpty
+            at != null
+                ? DateFormat('d MMM\nh:mm a').format(at.toLocal())
+                : days.isEmpty
                 ? '-'
                 : days
                     .map((day) =>
