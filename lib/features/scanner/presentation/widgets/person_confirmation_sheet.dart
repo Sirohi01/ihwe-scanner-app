@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/config/app_config.dart';
-
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../attendance/data/attendance_repository.dart';
@@ -35,6 +34,7 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
   int lunchQuantity = 1;
   late String buyerStatus;
   Map<String, dynamic>? concierge;
+  Map<String, dynamic>? exhibitorResources;
   Object? conciergeError;
 
   bool get isInternationalBuyer =>
@@ -42,13 +42,18 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
   bool get canMark => !isInternationalBuyer || buyerStatus == 'Approved';
   bool get isLunch => widget.result.person.passType == 'lunch';
   int get allocatedLunch =>
-      int.tryParse(widget.result.person.details['allocatedQuantity']?.toString() ?? '') ?? 1;
+      int.tryParse(
+          widget.result.person.details['allocatedQuantity']?.toString() ??
+              '') ??
+      1;
   int deliveredForDay(String day) {
-    final record = widget.result.attendance.cast<Map<String, dynamic>?>().firstWhere(
-        (item) => item?['eventDay']?.toString() == day,
-        orElse: () => null);
+    final record = widget.result.attendance
+        .cast<Map<String, dynamic>?>()
+        .firstWhere((item) => item?['eventDay']?.toString() == day,
+            orElse: () => null);
     return int.tryParse(record?['deliveredQuantity']?.toString() ?? '') ?? 0;
   }
+
   int remainingForDay(String day) =>
       (allocatedLunch - deliveredForDay(day)).clamp(0, allocatedLunch);
 
@@ -58,10 +63,24 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
     buyerStatus = widget.result.person.status.isEmpty
         ? 'Pending'
         : widget.result.person.status;
-    final open = widget.result.days.where((day) =>
-        isLunch ? remainingForDay(day) > 0 : !widget.result.attendedDays.contains(day)).toList();
+    final open = widget.result.days
+        .where((day) => isLunch
+            ? remainingForDay(day) > 0
+            : !widget.result.attendedDays.contains(day))
+        .toList();
     if (open.isNotEmpty && canMark) selected.add(open.first);
     if (widget.result.person.type == 'buyer') _loadConcierge();
+    if (widget.result.person.companyId.isNotEmpty) _loadExhibitorResources();
+  }
+
+  Future<void> _loadExhibitorResources() async {
+    try {
+      final value =
+          await widget.repository.companyDetail(widget.result.person.companyId);
+      if (mounted) setState(() => exhibitorResources = value);
+    } catch (_) {
+      // Pass verification remains available if resource data cannot be loaded.
+    }
   }
 
   Future<void> _loadConcierge() async {
@@ -111,14 +130,20 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
     if (!canMark || selected.isEmpty) return;
     setState(() => loading = true);
     try {
-      final results = await widget.repository
-          .mark(widget.raw, selected.toList(), source: widget.source,
-              quantity: isLunch ? lunchQuantity : null);
+      final results = await widget.repository.mark(
+          widget.raw, selected.toList(),
+          source: widget.source, quantity: isLunch ? lunchQuantity : null);
       if (!mounted) return;
-      final created = results.where((item) =>
-          item['created'] == true || item['deliveryRecorded'] == true).length;
+      final created = results
+          .where((item) =>
+              item['created'] == true || item['deliveryRecorded'] == true)
+          .length;
+      final queuedOffline =
+          results.any((item) => item['queuedOffline'] == true);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(created > 0
+        content: Text(queuedOffline
+            ? 'Saved offline. It will sync automatically when the connection returns.'
+            : created > 0
             ? isLunch
                 ? '$lunchQuantity lunch item(s) recorded for $created day(s).'
                 : 'Attendance marked for $created day(s).'
@@ -135,6 +160,36 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  Future<void> confirmAndMark() async {
+    final person = widget.result.person;
+    final dayText = selected.join(', ');
+    final remaining = isLunch && selected.isNotEmpty
+        ? selected.map(remainingForDay).reduce((a, b) => a < b ? a : b)
+        : null;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm activity'),
+        content: Text([
+          if (person.company.isNotEmpty) 'Company: ${person.company}',
+          'Pass: ${person.passType.isEmpty ? person.subType : person.passType}',
+          'Day: $dayText',
+          if (isLunch) 'Lunch quantity: $lunchQuantity',
+          if (isLunch) 'Remaining before delivery: $remaining',
+        ].join('\n')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('CANCEL')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('CONFIRM')),
+        ],
+      ),
+    );
+    if (approved == true) await mark();
   }
 
   @override
@@ -187,6 +242,10 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
                       ]),
                     ),
                   ),
+                  if (exhibitorResources != null) ...[
+                    const SizedBox(height: 10),
+                    _resourceSummary(),
+                  ],
                   if (isInternationalBuyer) ...[
                     const SizedBox(height: 10),
                     _buyerApprovalPanel(),
@@ -308,6 +367,48 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
     );
   }
 
+  Widget _resourceSummary() {
+    final free = List<Map<String, dynamic>>.from(
+        exhibitorResources?['freeAccessories'] ?? []);
+    final additional = List<Map<String, dynamic>>.from(
+        exhibitorResources?['additionalAccessories'] ?? []);
+    final activity = List<Map<String, dynamic>>.from(
+        exhibitorResources?['memberAttendance'] ?? []);
+    final lunchDelivered = activity
+        .where((item) => item['passType'] == 'lunch')
+        .fold<int>(
+            0,
+            (sum, item) =>
+                sum +
+                (int.tryParse(item['deliveredQuantity']?.toString() ?? '') ??
+                    0));
+    final freeEntitled = free.fold<int>(
+        0,
+        (sum, item) =>
+            sum + (int.tryParse(item['entitledQty']?.toString() ?? '') ?? 0));
+    final additionalQty = additional.fold<int>(
+        0,
+        (sum, item) =>
+            sum + (int.tryParse(item['qty']?.toString() ?? '') ?? 0));
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('EXHIBITOR RESOURCES',
+              style: TextStyle(
+                  fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+          const SizedBox(height: 9),
+          _detail(Icons.redeem_rounded, 'Free accessories',
+              '$freeEntitled allocated with stall'),
+          _detail(Icons.add_shopping_cart_rounded, 'Paid add-ons',
+              '$additionalQty ordered'),
+          _detail(Icons.lunch_dining_rounded, 'Lunch delivered',
+              '$lunchDelivered total'),
+        ]),
+      ),
+    );
+  }
+
   Widget _identityCard(PersonProfile person) => Container(
         width: double.infinity,
         padding: const EdgeInsets.all(14),
@@ -393,7 +494,8 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
   Widget _dayTile(String day) {
     final delivered = deliveredForDay(day);
     final remaining = remainingForDay(day);
-    final done = isLunch ? remaining == 0 : widget.result.attendedDays.contains(day);
+    final done =
+        isLunch ? remaining == 0 : widget.result.attendedDays.contains(day);
     final checked = selected.contains(day);
     return Card(
       margin: const EdgeInsets.only(bottom: 7),
@@ -426,10 +528,10 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
           isLunch
               ? '$delivered of $allocatedLunch delivered • $remaining remaining'
               : done
-              ? 'Already marked'
-              : checked
-                  ? 'Selected for entry'
-                  : 'Tap to select',
+                  ? 'Already marked'
+                  : checked
+                      ? 'Selected for entry'
+                      : 'Tap to select',
           style: TextStyle(
               fontSize: 9, color: done ? AppColors.emerald : Colors.black45),
         ),
@@ -449,7 +551,8 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
         padding: const EdgeInsets.all(14),
         child: Row(children: [
           const Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('LUNCH DELIVERY QUANTITY',
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
               SizedBox(height: 3),
@@ -464,7 +567,8 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
             icon: const Icon(Icons.remove_circle_outline),
           ),
           Text('$lunchQuantity',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
           IconButton(
             onPressed: lunchQuantity < selectedRemaining
                 ? () => setState(() => lunchQuantity++)
@@ -491,7 +595,8 @@ class _PersonConfirmationSheetState extends State<PersonConfirmationSheet> {
           height: 52,
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: loading || !canMark || selected.isEmpty ? null : mark,
+            onPressed:
+                loading || !canMark || selected.isEmpty ? null : confirmAndMark,
             icon: loading
                 ? const SizedBox.square(
                     dimension: 19,

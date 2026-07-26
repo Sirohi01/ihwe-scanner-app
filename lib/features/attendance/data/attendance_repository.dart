@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,7 +10,9 @@ class AttendanceRepository {
   AttendanceRepository(SessionStore session) : api = ApiClient(session);
   final ApiClient api;
   static const _files = MethodChannel('ihwe_attendance/files');
+  static const _offlineQueueKey = 'attendance_offline_mark_queue_v1';
   Future<ScanResult> resolve(String raw, {String source = 'qr'}) async {
+    await syncPendingMarks();
     final result =
         await api.post('/attendance/resolve', {'raw': raw, 'source': source});
     return ScanResult.fromJson(Map<String, dynamic>.from(result['data']));
@@ -59,12 +62,35 @@ class AttendanceRepository {
 
   Future<List<Map<String, dynamic>>> mark(String raw, List<String> days,
       {String source = 'qr', int? quantity}) async {
-    final result = await api.post('/attendance/mark', {
+    final operationId =
+        'attendance-${DateTime.now().microsecondsSinceEpoch}-${raw.hashCode}';
+    final payload = <String, dynamic>{
       'raw': raw,
       'days': days,
       'source': source,
+      'clientOperationId': operationId,
       if (quantity != null) 'quantity': quantity,
-    });
+    };
+    try {
+      return await _sendMark(payload);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      await _queueMark(payload);
+      return [
+        {
+          'queuedOffline': true,
+          'created': false,
+          'deliveryRecorded': false,
+          'days': days
+        }
+      ];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _sendMark(
+      Map<String, dynamic> payload) async {
+    final result = await api.post('/attendance/mark', payload);
     final created = List<Map<String, dynamic>>.from(result['data']['results'])
         .any((item) => item['created'] == true);
     if (created) {
@@ -74,6 +100,40 @@ class AttendanceRepository {
       syncDeviceHealth();
     }
     return List<Map<String, dynamic>>.from(result['data']['results']);
+  }
+
+  Future<void> _queueMark(Map<String, dynamic> payload) async {
+    final preferences = await SharedPreferences.getInstance();
+    final queue = (jsonDecode(preferences.getString(_offlineQueueKey) ?? '[]')
+            as List)
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    if (!queue.any(
+        (item) => item['clientOperationId'] == payload['clientOperationId'])) {
+      queue.add({...payload, 'queuedAt': DateTime.now().toIso8601String()});
+      await preferences.setString(_offlineQueueKey, jsonEncode(queue));
+    }
+  }
+
+  Future<int> syncPendingMarks() async {
+    final preferences = await SharedPreferences.getInstance();
+    final decoded =
+        jsonDecode(preferences.getString(_offlineQueueKey) ?? '[]') as List;
+    final queue =
+        decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+    if (queue.isEmpty) return 0;
+    final remaining = <Map<String, dynamic>>[];
+    var synced = 0;
+    for (final item in queue) {
+      try {
+        await _sendMark(item..remove('queuedAt'));
+        synced++;
+      } catch (_) {
+        remaining.add(item);
+      }
+    }
+    await preferences.setString(_offlineQueueKey, jsonEncode(remaining));
+    return synced;
   }
 
   Future<Map<String, dynamic>> buyerConcierge(String buyerId) async =>
