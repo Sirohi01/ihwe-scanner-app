@@ -52,6 +52,7 @@ class _AiSummarySheetState extends State<_AiSummarySheet> {
           await widget.repository.aiSummary(widget.scope, id: widget.id);
       if (mounted) setState(() => summary = result);
     } catch (value) {
+      debugPrint('AI summary request failed: $value');
       if (mounted) setState(() => error = value);
     }
   }
@@ -125,7 +126,8 @@ class _AiSummarySheetState extends State<_AiSummarySheet> {
                             const Icon(Icons.error_outline_rounded,
                                 color: Colors.redAccent, size: 38),
                             const SizedBox(height: 10),
-                            Text('$error', textAlign: TextAlign.center),
+                            const Text('Could not generate summary. Please try again.',
+                                textAlign: TextAlign.center),
                             const SizedBox(height: 12),
                             FilledButton.icon(
                                 onPressed: load,

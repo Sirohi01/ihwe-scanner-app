@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../storage/session_store.dart';
@@ -19,27 +21,27 @@ class ApiClient {
       {Map<String, String>? query}) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$path')
         .replace(queryParameters: query);
-    return _decode(await http.get(uri, headers: _headers));
+    return _request(() => http.get(uri, headers: _headers));
   }
 
   Future<Map<String, dynamic>> post(
       String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
-    return _decode(
-        await http.post(uri, headers: _headers, body: jsonEncode(body)));
+    return _request(
+        () => http.post(uri, headers: _headers, body: jsonEncode(body)));
   }
 
   Future<Map<String, dynamic>> patch(
       String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
-    return _decode(
-        await http.patch(uri, headers: _headers, body: jsonEncode(body)));
+    return _request(
+        () => http.patch(uri, headers: _headers, body: jsonEncode(body)));
   }
 
   Future<Map<String, dynamic>> delete(String path,
       {Map<String, dynamic>? body}) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
-    return _decode(await http.delete(uri,
+    return _request(() => http.delete(uri,
         headers: _headers, body: body == null ? null : jsonEncode(body)));
   }
 
@@ -47,7 +49,7 @@ class ApiClient {
       {Map<String, String>? query}) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$path')
         .replace(queryParameters: query);
-    final response = await http.get(uri, headers: _headers);
+    final response = await _guard(() => http.get(uri, headers: _headers));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       _decode(response);
     }
@@ -75,14 +77,42 @@ class ApiClient {
       };
 
   Map<String, dynamic> _decode(http.Response response) {
-    final dynamic parsed =
-        response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
+    dynamic parsed;
+    try {
+      parsed = response.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body);
+    } on FormatException {
+      throw ApiException('Server returned an invalid response. Please retry.');
+    }
     final data = parsed is Map<String, dynamic> ? parsed : <String, dynamic>{};
     if (response.statusCode < 200 || response.statusCode >= 300) {
       if (response.statusCode == 401) session.clear();
+      if (response.statusCode >= 500) {
+        throw ApiException(
+            'Server is temporarily unavailable. Please try again.',
+            response.statusCode);
+      }
       throw ApiException(
           data['message']?.toString() ?? 'Request failed', response.statusCode);
     }
     return data;
+  }
+
+  Future<Map<String, dynamic>> _request(
+          Future<http.Response> Function() request) async =>
+      _decode(await _guard(request));
+
+  Future<http.Response> _guard(
+      Future<http.Response> Function() request) async {
+    try {
+      return await request().timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      throw ApiException('Request timed out. Please try again.');
+    } on SocketException {
+      throw ApiException('Unable to connect to the server.');
+    } on http.ClientException {
+      throw ApiException('Unable to connect to the server.');
+    }
   }
 }
